@@ -1,0 +1,17 @@
+{
+  "note": "Synthetic design example; not computed from RDF",
+  "releaseId": "R-001",
+  "snapshotId": "sha256:example",
+  "policyVersion": "evidence-qualification-v1-proposed",
+  "assessments": [
+    {
+      "obligationId": "OB-2",
+      "status": "unknown",
+      "reasons": [
+        "MISSING_RELEASE_CUTOFF"
+      ],
+      "evidenceIds": [],
+      "evaluatedAt": "2026-10-29T00:00:00Z"
+    }
+  ]
+}

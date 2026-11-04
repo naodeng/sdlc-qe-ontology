@@ -1,0 +1,1 @@
+PASS: 8 candidate fixture contract checks (NOT runtime policy tests)

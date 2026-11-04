@@ -1,0 +1,10 @@
+@prefix ex: <https://example.org/sdlc-qe/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+ex:req-checkout a ex:Requirement ; ex:hasAcceptanceCriterion ex:ac-checkout .
+ex:ac-checkout a ex:AcceptanceCriterion .
+ex:obligation-checkout a ex:TestObligation ; ex:derivedFrom ex:ac-checkout .
+ex:test-checkout a ex:TestCase ; ex:addresses ex:obligation-checkout .
+ex:execution-checkout a ex:TestExecution ; ex:executes ex:test-checkout .
+ex:evidence-checkout a ex:TestEvidence ; prov:wasGeneratedBy ex:execution-checkout .
+ex:change-checkout a ex:CodeChange ; ex:modifies ex:component-checkout .
+ex:component-checkout a ex:Component .

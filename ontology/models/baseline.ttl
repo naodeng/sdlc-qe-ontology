@@ -1,0 +1,40 @@
+@prefix ex: <https://example.org/sdlc-qe/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+
+ex: a owl:Ontology ; rdfs:label "SDLC-QE experimental ontology"@en , "研发与质量工程实验本体"@zh .
+ex:Requirement a owl:Class ; rdfs:label "Requirement"@en , "需求"@zh .
+ex:AcceptanceCriterion a owl:Class ; rdfs:label "Acceptance criterion"@en , "验收标准"@zh .
+ex:TestObligation a owl:Class ; rdfs:label "Test obligation"@en , "测试义务"@zh .
+ex:TestCase a owl:Class ; rdfs:label "Test case"@en , "测试用例"@zh .
+ex:TestExecution a owl:Class ; rdfs:subClassOf prov:Activity ; rdfs:label "Test execution"@en , "测试执行"@zh .
+ex:TestEvidence a owl:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "Test evidence"@en , "测试证据"@zh .
+ex:CodeChange a owl:Class ; rdfs:label "Code change"@en , "代码变更"@zh .
+ex:Component a owl:Class ; rdfs:label "Component"@en , "组件"@zh .
+ex:QualityClaim a owl:Class ; rdfs:label "Quality claim"@en , "质量声明"@zh .
+ex:hasAcceptanceCriterion a owl:ObjectProperty ; rdfs:domain ex:Requirement ; rdfs:range ex:AcceptanceCriterion .
+ex:derivedFrom a owl:ObjectProperty ; rdfs:domain ex:TestObligation ; rdfs:range ex:AcceptanceCriterion .
+ex:addresses a owl:ObjectProperty ; rdfs:domain ex:TestCase ; rdfs:range ex:TestObligation .
+ex:executes a owl:ObjectProperty ; rdfs:domain ex:TestExecution ; rdfs:range ex:TestCase .
+ex:modifies a owl:ObjectProperty ; rdfs:domain ex:CodeChange ; rdfs:range ex:Component .
+
+# v0.8 provisional SDLC concepts (not standardized mappings)
+ex:PullRequest a owl:Class ; rdfs:label "Pull request"@en, "拉取请求"@zh .
+ex:Build a owl:Class ; rdfs:subClassOf prov:Activity ; rdfs:label "Build"@en, "构建"@zh .
+ex:Release a owl:Class ; rdfs:label "Release"@en, "发布"@zh .
+ex:includesChange a owl:ObjectProperty ; rdfs:domain ex:PullRequest ; rdfs:range ex:CodeChange .
+ex:builtFrom a owl:ObjectProperty ; rdfs:domain ex:Build ; rdfs:range ex:PullRequest .
+ex:containsBuild a owl:ObjectProperty ; rdfs:domain ex:Release ; rdfs:range ex:Build .
+ex:targetsRequirement a owl:ObjectProperty ; rdfs:domain ex:CodeChange ; rdfs:range ex:Requirement .
+ex:hasExecution a owl:ObjectProperty ; rdfs:domain ex:Build ; rdfs:range ex:TestExecution .
+
+# v0.9 evidence assertions: operational fields, not proof of trust
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+ex:executionStatus a owl:DatatypeProperty ; rdfs:domain ex:TestExecution ; rdfs:range xsd:string .
+ex:executionEnvironment a owl:DatatypeProperty ; rdfs:domain ex:TestExecution ; rdfs:range xsd:string .
+ex:buildEnvironment a owl:DatatypeProperty ; rdfs:domain ex:Build ; rdfs:range xsd:string .
+ex:executedAt a owl:DatatypeProperty ; rdfs:domain ex:TestExecution ; rdfs:range xsd:dateTime .
+ex:releaseCutoff a owl:DatatypeProperty ; rdfs:domain ex:Release ; rdfs:range xsd:dateTime .
+ex:evidenceDigest a owl:DatatypeProperty ; rdfs:domain ex:TestEvidence ; rdfs:range xsd:string .

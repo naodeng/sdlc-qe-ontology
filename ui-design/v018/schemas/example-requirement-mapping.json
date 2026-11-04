@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "profileId": "refund-requirements-v1",
+  "sourceType": "csv",
+  "entityType": "Requirement",
+  "idField": "req_key",
+  "mappings": [
+    {
+      "sourceField": "req_key",
+      "targetProperty": "id",
+      "valueType": "string",
+      "required": true
+    },
+    {
+      "sourceField": "title",
+      "targetProperty": "title",
+      "valueType": "string",
+      "required": true
+    }
+  ]
+}

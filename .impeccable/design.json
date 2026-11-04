@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "surface": "SDLC-QE Ontology Workbench",
+  "mode": "operate",
+  "direction": "Chinese-first calm evidence atlas",
+  "colors": {
+    "canvas": "#F3F6F2",
+    "ink": "#18352F",
+    "forest": "#164C41",
+    "leaf": "#C9EDCE",
+    "unknown": "#FFF2D6",
+    "focus": "#BA8E31",
+    "paper": "#FFFFFF"
+  },
+  "typography": {
+    "interface": "PingFang SC, Source Han Sans SC, Noto Sans CJK SC, Microsoft YaHei, sans-serif",
+    "display": "Songti SC, Source Han Serif SC, Noto Serif CJK SC, serif",
+    "data": "ui-monospace, SFMono-Regular, Menlo, monospace",
+    "baseSizePx": 14,
+    "headingScale": [14, 16, 23, 31, 38]
+  },
+  "geometry": {
+    "ruleWidthPx": 1,
+    "controlRadiusPx": 11,
+    "cardShadow": "subtle"
+  },
+  "motion": "subtle state transitions; respects reduced motion"
+}

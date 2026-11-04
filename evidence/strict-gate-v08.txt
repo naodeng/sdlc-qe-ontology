@@ -1,0 +1,5 @@
+command: ['python', 'scripts/verify_baseline.py']
+exit_code: 2
+
+
+BLOCKED: pyshacl is required for the release gate; install project validation dependencies.

@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/sdlc-qe/mapping-profile-v1.schema.json",
+  "title": "MappingProfileV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "profileId",
+    "sourceType",
+    "entityType",
+    "idField",
+    "mappings"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "profileId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sourceType": {
+      "enum": [
+        "csv",
+        "json"
+      ]
+    },
+    "entityType": {
+      "enum": [
+        "Requirement",
+        "Change",
+        "Build",
+        "Release",
+        "TestObligation",
+        "TestExecution",
+        "Evidence"
+      ]
+    },
+    "idField": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mappings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceField",
+          "targetProperty",
+          "valueType"
+        ],
+        "properties": {
+          "sourceField": {
+            "type": "string",
+            "minLength": 1
+          },
+          "targetProperty": {
+            "type": "string",
+            "minLength": 1
+          },
+          "valueType": {
+            "enum": [
+              "string",
+              "dateTime",
+              "boolean",
+              "integer",
+              "reference"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "referenceType": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

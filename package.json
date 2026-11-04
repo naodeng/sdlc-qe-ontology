@@ -1,0 +1,10 @@
+{
+  "name": "sdlc-qe-ontology-workbench",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "devDependencies": {
+    "@playwright/test": "^1.64.1"
+  }
+}

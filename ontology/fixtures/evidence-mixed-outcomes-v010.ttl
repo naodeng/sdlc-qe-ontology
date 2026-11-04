@@ -1,0 +1,23 @@
+@prefix ex: <https://example.org/sdlc-qe/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+ex:req-checkout a ex:Requirement ; ex:hasAcceptanceCriterion ex:ac-checkout .
+ex:ac-checkout a ex:AcceptanceCriterion .
+ex:obligation-checkout a ex:TestObligation ; ex:derivedFrom ex:ac-checkout .
+ex:test-checkout a ex:TestCase ; ex:addresses ex:obligation-checkout .
+ex:execution-checkout a ex:TestExecution ; ex:executes ex:test-checkout .
+ex:evidence-checkout a ex:TestEvidence ; prov:wasGeneratedBy ex:execution-checkout .
+ex:component-checkout a ex:Component .
+ex:change-checkout a ex:CodeChange ; ex:modifies ex:component-checkout ; ex:targetsRequirement ex:req-checkout .
+ex:pr-checkout a ex:PullRequest ; ex:includesChange ex:change-checkout .
+ex:build-checkout a ex:Build ; ex:builtFrom ex:pr-checkout ; ex:hasExecution ex:execution-checkout .
+ex:release-checkout a ex:Release ; ex:containsBuild ex:build-checkout .
+
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+ex:execution-checkout ex:executionStatus "passed" ; ex:executionEnvironment "staging" ; ex:executedAt "2026-10-29T08:00:00Z"^^xsd:dateTime .
+ex:build-checkout ex:buildEnvironment "staging" .
+ex:release-checkout ex:releaseCutoff "2026-10-29T09:00:00Z"^^xsd:dateTime .
+ex:evidence-checkout ex:evidenceDigest "sha256:0123456789abcdef" .
+
+ex:execution-retry a ex:TestExecution ; ex:executes ex:test-checkout ; ex:executionStatus "failed" ; ex:executionEnvironment "staging" ; ex:executedAt "2026-10-29T08:30:00Z"^^xsd:dateTime .
+ex:build-checkout ex:hasExecution ex:execution-retry .
+ex:evidence-retry a ex:TestEvidence ; prov:wasGeneratedBy ex:execution-retry ; ex:evidenceDigest "sha256:bad" .

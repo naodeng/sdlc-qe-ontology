@@ -1,0 +1,7 @@
+@prefix ex: <https://example.org/sdlc-qe/> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+ex:RequirementShape a sh:NodeShape ; sh:targetClass ex:Requirement ;
+ sh:property [ sh:path ex:hasAcceptanceCriterion ; sh:minCount 1 ; sh:class ex:AcceptanceCriterion ] .
+ex:TestExecutionShape a sh:NodeShape ; sh:targetClass ex:TestExecution ;
+ sh:property [ sh:path ex:executes ; sh:minCount 1 ; sh:class ex:TestCase ] .

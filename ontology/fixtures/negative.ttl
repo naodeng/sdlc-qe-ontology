@@ -1,0 +1,3 @@
+@prefix ex: <https://example.org/sdlc-qe/> .
+ex:brokenRequirement a ex:Requirement .
+ex:brokenExecution a ex:TestExecution .

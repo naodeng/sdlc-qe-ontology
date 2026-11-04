@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "complete-pass",
+      "inventoryComplete": true,
+      "obligations": [
+        "qualified"
+      ],
+      "expected": "qualified"
+    },
+    {
+      "id": "known-failure",
+      "inventoryComplete": true,
+      "obligations": [
+        "unqualified"
+      ],
+      "expected": "unqualified"
+    },
+    {
+      "id": "mixed",
+      "inventoryComplete": true,
+      "obligations": [
+        "qualified",
+        "unknown"
+      ],
+      "expected": "unknown"
+    },
+    {
+      "id": "missing-inventory",
+      "inventoryComplete": false,
+      "obligations": [
+        "qualified"
+      ],
+      "expected": "unknown"
+    },
+    {
+      "id": "empty-inventory",
+      "inventoryComplete": true,
+      "obligations": [],
+      "expected": "unknown"
+    },
+    {
+      "id": "partial-with-failure",
+      "inventoryComplete": false,
+      "obligations": [
+        "unqualified"
+      ],
+      "expected": "unknown"
+    }
+  ]
+}

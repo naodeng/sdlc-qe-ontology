@@ -1,0 +1,58 @@
+openapi: 3.1.0
+info:
+  title: SDLC-QE Ontology Workbench Local Read-only API
+  version: 0.1.0-bootstrap
+  description: Implemented local bootstrap contract. Product import and assessment APIs are not implemented.
+servers:
+  - url: http://127.0.0.1:8000
+paths:
+  /api/v1/health:
+    get:
+      operationId: getHealth
+      responses:
+        '200':
+          description: API process health
+  /api/v1/meta:
+    get:
+      operationId: getMeta
+      responses:
+        '200':
+          description: Bundled candidate ontology and demo fixture metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkbenchMeta'
+components:
+  schemas:
+    WorkbenchMeta:
+      type: object
+      required:
+        - snapshotId
+        - ontologyVersion
+        - validation
+        - tripleCount
+        - classCount
+        - propertyCount
+        - dataSource
+      properties:
+        snapshotId:
+          type: string
+          description: Content-derived identifier for the bundled example fixture; not a user workspace snapshot.
+        ontologyVersion:
+          type: string
+          description: unversioned-candidate until the ontology publishes version metadata.
+        validation:
+          type: string
+          enum: [passed, failed, not_run, unavailable]
+        tripleCount:
+          type: integer
+          minimum: 0
+        classCount:
+          type: integer
+          minimum: 0
+        propertyCount:
+          type: integer
+          minimum: 0
+        dataSource:
+          type: string
+          const: bundled-example-fixture

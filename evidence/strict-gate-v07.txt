@@ -1,0 +1,3 @@
+BLOCKED: pyshacl is required for the release gate; install project validation dependencies.
+
+EXIT_CODE=2

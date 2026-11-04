@@ -1,0 +1,3 @@
+PREFIX ex: <https://example.org/sdlc-qe/>
+PREFIX prov: <http://www.w3.org/ns/prov#>
+SELECT ?execution WHERE { ex:proof1 prov:wasGeneratedBy ?execution . }

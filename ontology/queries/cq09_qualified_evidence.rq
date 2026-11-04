@@ -1,0 +1,15 @@
+PREFIX ex: <https://example.org/sdlc-qe/>
+PREFIX prov: <http://www.w3.org/ns/prov#>
+SELECT DISTINCT ?release ?obligation ?evidence WHERE {
+  ?release a ex:Release ; ex:containsBuild ?build ; ex:releaseCutoff ?cutoff .
+  ?build ex:builtFrom ?pr ; ex:hasExecution ?execution ; ex:buildEnvironment ?buildEnv .
+  ?pr ex:includesChange ?change .
+  ?change ex:targetsRequirement ?requirement .
+  ?requirement ex:hasAcceptanceCriterion ?criterion .
+  ?obligation ex:derivedFrom ?criterion .
+  ?test ex:addresses ?obligation .
+  ?execution ex:executes ?test ; ex:executionStatus "passed" ;
+             ex:executionEnvironment ?executionEnv ; ex:executedAt ?at .
+  ?evidence prov:wasGeneratedBy ?execution ; ex:evidenceDigest ?digest .
+  FILTER (?executionEnv = ?buildEnv && ?at <= ?cutoff && STRLEN(STR(?digest)) > 0)
+} ORDER BY ?release ?obligation ?evidence

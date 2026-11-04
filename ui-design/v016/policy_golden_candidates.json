@@ -1,0 +1,102 @@
+{
+  "note": "candidate specification fixtures, not a verified production engine",
+  "cases": [
+    {
+      "id": "complete_pass",
+      "catalogComplete": true,
+      "metadataComplete": true,
+      "provenanceTrusted": true,
+      "evidence": [
+        "eligible"
+      ],
+      "validation": "passed",
+      "assessment": "qualified",
+      "assurance": "verified"
+    },
+    {
+      "id": "all_fail",
+      "catalogComplete": true,
+      "metadataComplete": true,
+      "provenanceTrusted": true,
+      "evidence": [
+        "ineligible"
+      ],
+      "validation": "passed",
+      "assessment": "unqualified",
+      "assurance": "verified"
+    },
+    {
+      "id": "missing_cutoff",
+      "catalogComplete": true,
+      "metadataComplete": false,
+      "provenanceTrusted": true,
+      "evidence": [
+        "eligible"
+      ],
+      "validation": "passed",
+      "assessment": "unknown",
+      "assurance": "verified"
+    },
+    {
+      "id": "incomplete_catalog",
+      "catalogComplete": false,
+      "metadataComplete": true,
+      "provenanceTrusted": true,
+      "evidence": [
+        "eligible"
+      ],
+      "validation": "passed",
+      "assessment": "unknown",
+      "assurance": "blocked"
+    },
+    {
+      "id": "mixed",
+      "catalogComplete": true,
+      "metadataComplete": true,
+      "provenanceTrusted": true,
+      "evidence": [
+        "eligible",
+        "ineligible"
+      ],
+      "validation": "passed",
+      "assessment": "qualified",
+      "assurance": "verified"
+    },
+    {
+      "id": "provenance_unknown",
+      "catalogComplete": true,
+      "metadataComplete": true,
+      "provenanceTrusted": false,
+      "evidence": [
+        "eligible"
+      ],
+      "validation": "passed",
+      "assessment": "unknown",
+      "assurance": "verified"
+    },
+    {
+      "id": "shacl_not_run",
+      "catalogComplete": true,
+      "metadataComplete": true,
+      "provenanceTrusted": true,
+      "evidence": [
+        "eligible"
+      ],
+      "validation": "not_run",
+      "assessment": "qualified",
+      "assurance": "blocked"
+    },
+    {
+      "id": "evidence_indeterminate",
+      "catalogComplete": true,
+      "metadataComplete": true,
+      "provenanceTrusted": true,
+      "evidence": [
+        "indeterminate"
+      ],
+      "validation": "passed",
+      "assessment": "unknown",
+      "assurance": "verified"
+    }
+  ]
+}

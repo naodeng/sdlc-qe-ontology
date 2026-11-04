@@ -1,0 +1,11 @@
+@prefix ex: <https://example.org/sdlc-qe/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+ex:r1 a ex:Requirement ; ex:hasAcceptanceCriterion ex:ac1 .
+ex:ac1 a ex:AcceptanceCriterion .
+ex:o1 a ex:TestObligation ; ex:derivedFrom ex:ac1 .
+ex:o2 a ex:TestObligation ; ex:derivedFrom ex:ac1 .
+ex:t1 a ex:TestCase ; ex:addresses ex:o1 .
+ex:e1 a ex:TestExecution ; ex:executes ex:t1 .
+ex:proof1 a ex:TestEvidence ; prov:wasGeneratedBy ex:e1 .
+ex:change1 a ex:CodeChange ; ex:modifies ex:component1 .
+ex:component1 a ex:Component .

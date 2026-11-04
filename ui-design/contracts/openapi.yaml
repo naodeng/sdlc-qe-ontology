@@ -1,0 +1,52 @@
+openapi: 3.1.0
+info:
+  title: SDLC-QE Ontology Workbench Read-only API
+  version: 0.1.0-design
+  description: Candidate contract. Not implemented.
+paths:
+  /api/v1/meta:
+    get:
+      operationId: getMeta
+      responses:
+        '200':
+          description: Snapshot and ontology metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [snapshotId, ontologyVersion, validation]
+                properties:
+                  snapshotId: {type: string}
+                  ontologyVersion: {type: string}
+                  validation: {type: string, enum: [passed, failed, not_run, unavailable]}
+  /api/v1/releases/{id}/assessments:
+    get:
+      operationId: getReleaseAssessments
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Advisory assessments
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [releaseId, snapshotId, policyVersion, assessments]
+                properties:
+                  releaseId: {type: string}
+                  snapshotId: {type: string}
+                  policyVersion: {type: string}
+                  assessments:
+                    type: array
+                    items:
+                      type: object
+                      required: [obligationId, status, reasons, evidenceIds, evaluatedAt]
+                      properties:
+                        obligationId: {type: string}
+                        status: {type: string, enum: [qualified, unqualified, unknown]}
+                        reasons: {type: array, items: {type: string}}
+                        evidenceIds: {type: array, items: {type: string}}
+                        evaluatedAt: {type: string, format: date-time}

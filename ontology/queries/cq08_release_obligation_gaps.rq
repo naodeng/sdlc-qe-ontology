@@ -1,0 +1,15 @@
+PREFIX ex: <https://example.org/sdlc-qe/>
+SELECT DISTINCT ?release ?obligation WHERE {
+  ?release a ex:Release ; ex:containsBuild ?build .
+  ?build ex:builtFrom ?pr .
+  ?pr ex:includesChange ?change .
+  ?change ex:targetsRequirement ?requirement .
+  ?requirement ex:hasAcceptanceCriterion ?criterion .
+  ?obligation ex:derivedFrom ?criterion .
+  FILTER NOT EXISTS {
+    ?build ex:hasExecution ?execution .
+    ?execution ex:executes ?test .
+    ?test ex:addresses ?obligation .
+    ?evidence <http://www.w3.org/ns/prov#wasGeneratedBy> ?execution .
+  }
+} ORDER BY ?release ?obligation

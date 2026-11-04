@@ -1,0 +1,6 @@
+PREFIX ex: <https://example.org/sdlc-qe/>
+PREFIX prov: <http://www.w3.org/ns/prov#>
+SELECT ?evidence ?execution ?test WHERE {
+  ?evidence a ex:TestEvidence ; prov:wasGeneratedBy ?execution .
+  ?execution ex:executes ?test .
+} ORDER BY ?evidence

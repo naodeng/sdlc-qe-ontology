@@ -1,0 +1,13 @@
+PREFIX ex: <https://example.org/sdlc-qe/>
+PREFIX prov: <http://www.w3.org/ns/prov#>
+SELECT DISTINCT ?release ?pr ?requirement ?obligation ?evidence WHERE {
+  ?release a ex:Release ; ex:containsBuild ?build .
+  ?build ex:builtFrom ?pr ; ex:hasExecution ?execution .
+  ?pr ex:includesChange ?change .
+  ?change ex:targetsRequirement ?requirement .
+  ?requirement ex:hasAcceptanceCriterion ?criterion .
+  ?obligation ex:derivedFrom ?criterion .
+  ?execution ex:executes ?test .
+  ?test ex:addresses ?obligation .
+  ?evidence prov:wasGeneratedBy ?execution .
+} ORDER BY ?release ?obligation

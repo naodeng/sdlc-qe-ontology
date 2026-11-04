@@ -1,0 +1,334 @@
+openapi: 3.1.0
+info:
+  title: SDLC-QE Ontology Workbench Read-only API
+  version: 0.14.0-design
+  description: Design contract only, no implementation or operational guarantee.
+paths:
+  /api/v1/system/info:
+    get:
+      operationId: getSystemInfo
+      summary: Authoritative runtime version and validation metadata
+      responses:
+        '200':
+          description: Snapshot-bound read-only response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '400':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/v1/overview:
+    get:
+      operationId: getOverview
+      summary: Overview summary
+      responses:
+        '200':
+          description: Snapshot-bound read-only response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '400':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - &id001
+        name: X-Snapshot-Id
+        in: header
+        required: false
+        schema: &id002
+          type: string
+        description: Expected immutable snapshot; 409 if mismatch
+  /api/v1/ontology/terms:
+    get:
+      operationId: listOntologyTerms
+      summary: Paginated ontology classes/properties
+      responses:
+        '200':
+          description: Snapshot-bound read-only response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '400':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - *id001
+      - &id003
+        name: cursor
+        in: query
+        required: false
+        schema: *id002
+  /api/v1/ontology/terms/{id}:
+    get:
+      operationId: getOntologyTerm
+      summary: Ontology term by opaque ID
+      responses:
+        '200':
+          description: Snapshot-bound read-only response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '400':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - &id004
+        name: id
+        in: path
+        required: true
+        schema: *id002
+      - *id001
+  /api/v1/graph/neighborhood:
+    get:
+      operationId: getGraphNeighborhood
+      summary: Bounded graph and accessible list
+      responses:
+        '200':
+          description: Snapshot-bound read-only response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '400':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - *id001
+      - name: entityId
+        in: query
+        required: true
+        schema: *id002
+      - name: hops
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2
+          default: 1
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+  /api/v1/obligations:
+    get:
+      operationId: listObligations
+      summary: Paginated obligations
+      responses:
+        '200':
+          description: Snapshot-bound read-only response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '400':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - *id001
+      - *id003
+  /api/v1/obligations/{id}/evidence:
+    get:
+      operationId: getObligationEvidence
+      summary: Evidence and provenance for obligation
+      responses:
+        '200':
+          description: Snapshot-bound read-only response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '400':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - *id004
+      - *id001
+      - *id003
+  /api/v1/releases:
+    get:
+      operationId: listReleases
+      summary: Paginated releases
+      responses:
+        '200':
+          description: Snapshot-bound read-only response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '400':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - *id001
+      - *id003
+  /api/v1/releases/{id}/assessments:
+    get:
+      operationId: getReleaseAssessments
+      summary: Advisory release and obligation assessments
+      responses:
+        '200':
+          description: Snapshot-bound read-only response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '400':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - *id004
+      - *id001
+  /api/v1/validation/status:
+    get:
+      operationId: getValidationStatus
+      summary: Validation results pinned to snapshot
+      responses:
+        '200':
+          description: Snapshot-bound read-only response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '400':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - *id001
+components:
+  schemas:
+    Error:
+      type: object
+      required:
+      - code
+      - message
+      - requestId
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        requestId:
+          type: string
+        snapshotId:
+          type:
+          - string
+          - 'null'
+    SystemInfo:
+      type: object
+      required:
+      - apiVersion
+      - validationStatus
+      properties:
+        appVersion:
+          type:
+          - string
+          - 'null'
+        ontologyVersion:
+          type:
+          - string
+          - 'null'
+        ontologyIri:
+          type:
+          - string
+          - 'null'
+        policyVersion:
+          type:
+          - string
+          - 'null'
+        shapesVersion:
+          type:
+          - string
+          - 'null'
+        datasetVersion:
+          type:
+          - string
+          - 'null'
+        snapshotId:
+          type:
+          - string
+          - 'null'
+        validationRunId:
+          type:
+          - string
+          - 'null'
+        builtAt:
+          type:
+          - string
+          - 'null'
+        apiVersion: *id002
+        validationStatus:
+          type: string
+          enum:
+          - passed
+          - failed
+          - not_run
+          - unavailable
+          - stale
+    Envelope:
+      type: object
+      required:
+      - snapshotId
+      - data
+      properties:
+        snapshotId: *id002
+        data:
+          type: object
+          additionalProperties: true
+        truncated:
+          type: boolean
+        nextCursor:
+          type:
+          - string
+          - 'null'
+        assuranceStatus:
+          type: string
+          enum:
+          - verified
+          - blocked
+          - not_run
+          - stale
+          - unavailable
+  responses:
+    Error:
+      description: Structured error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

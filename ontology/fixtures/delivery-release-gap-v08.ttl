@@ -1,0 +1,8 @@
+@prefix ex: <https://example.org/sdlc-qe/> .
+ex:req-gap a ex:Requirement ; ex:hasAcceptanceCriterion ex:ac-gap .
+ex:ac-gap a ex:AcceptanceCriterion .
+ex:obligation-gap a ex:TestObligation ; ex:derivedFrom ex:ac-gap .
+ex:change-gap a ex:CodeChange ; ex:targetsRequirement ex:req-gap .
+ex:pr-gap a ex:PullRequest ; ex:includesChange ex:change-gap .
+ex:build-gap a ex:Build ; ex:builtFrom ex:pr-gap .
+ex:release-gap a ex:Release ; ex:containsBuild ex:build-gap .

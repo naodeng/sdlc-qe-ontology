@@ -1,0 +1,5 @@
+PREFIX ex: <https://example.org/sdlc-qe/>
+SELECT ?obligation WHERE {
+  ?obligation a ex:TestObligation .
+  FILTER NOT EXISTS { ?test a ex:TestCase ; ex:addresses ?obligation . }
+} ORDER BY ?obligation
