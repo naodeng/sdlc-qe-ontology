@@ -22,3 +22,12 @@ Scope / 范围: repository bootstrap, not the complete MVP / 仓库基础搭建�
 ## 当前结论 / Current conclusion
 
 Static, API, ontology, schema, build, and manual visual checks pass. Automated browser E2E remains `NOT_RUN` after the isolation fix, so the repository's full verification set is not yet green. This bootstrap does not implement project imports, mapping approvals, quality assessment, or snapshot activation; the MVP remains Candidate / No-Go.
+
+
+## CI lockfile follow-up / CI 锁文件修复
+
+- Initial GitHub Actions run `41819755874` failed on Ubuntu during the Vite build: `package-lock.json` contained only the macOS ARM64 Rolldown and LightningCSS native packages. Playwright E2E was skipped because the build step failed.
+- Added `tests/test_npm_lockfile_optional_dependencies.py`. It failed before the fix with 24 missing platform-specific package records, then passed after adding metadata for all 26 declared Rolldown and LightningCSS platform packages.
+- Clean isolated install with npm 11.19.1: `npm ci` passed (67 packages added, 0 vulnerabilities); `npm --workspace frontend run build` passed (764 modules transformed).
+- Isolated worktree `./scripts/verify.sh`: passed — Ruff, 27 tests, 58 subtests, SPARQL CQs, SHACL positive/negative fixtures, mapping schema positive/negative cases, TypeScript, and Vite build.
+- Linux hosted-runner build and Playwright E2E remain pending until the corrected commit's GitHub Actions run completes.
