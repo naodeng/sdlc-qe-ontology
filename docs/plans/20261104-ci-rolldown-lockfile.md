@@ -27,7 +27,7 @@ GitHub Actions: checkout → `make setup` / `npm ci` → `make verify` / Vite bu
 ## 单元 / API / SPARQL / SHACL / E2E / 安全测试
 - npm 11.19.1 的干净副本中执行 `npm ci` 与 `npm --workspace frontend run build`：通过。
 - 隔离 worktree 执行 `./scripts/verify.sh`：通过，27 tests、58 subtests，含 Ruff、SPARQL、SHACL、mapping schema 与前端构建。
-- GitHub Actions 的 Linux 质量门和 Playwright E2E：推送后待确认；在确认前不标记为通过。
+- GitHub Actions run `41823621216`：Linux 质量门、Chromium 安装和 Playwright E2E 全部通过。
 
 ## 风险、回滚、可观测证据
 锁文件可能包含 npm 重新计算的包布局；通过审查差异并做干净安装检查。失败时不推送，恢复本次锁文件改动即可。远端 Actions run 和本地验证记录作为证据。
@@ -37,4 +37,4 @@ GitHub Actions: checkout → `make setup` / `npm ci` → `make verify` / Vite bu
 - 不修改双语产品文档；本次不涉及用户可见功能。
 
 ## 人工审批与执行结果
-用户已授权修复。未涉及语义、破坏性操作或高风险变更。本地 RED/GREEN 与干净安装验证已完成；远端 Linux CI 和 E2E 结果待推送后确认。
+用户已授权修复。未涉及语义、破坏性操作或高风险变更。本地 RED/GREEN、干净安装、完整质量门，以及远端 Linux CI 和 E2E 均已通过。
