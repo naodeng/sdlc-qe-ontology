@@ -65,10 +65,19 @@ function AppFrame() {
   }, []);
 
   return (
+    <>
+    <a className="skip-link" href="#main-content">{copy.skipToContent}</a>
     <Layout className="workbench-frame">
-      <Sider className="workbench-sidebar" width={254} breakpoint="lg" collapsedWidth={72}>
+      <Sider className="workbench-sidebar" width={228} breakpoint="lg" collapsedWidth={0}>
         <Link to="/" className="brand-lockup" aria-label="SDLC-QE 质量证据工作台首页">
-          <span className="brand-symbol" aria-hidden="true"><span /><span /><span /></span>
+          <span className="brand-symbol" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none">
+              <path d="M8 10.5 23 8M9 12l6.5 10m6.5-12-6.2 12" />
+              <circle cx="7" cy="10.5" r="2.3" />
+              <circle cx="24.5" cy="7.8" r="2.3" />
+              <circle cx="16" cy="23.5" r="2.3" />
+            </svg>
+          </span>
           <span className="brand-copy">
             <strong className="brand-name">SDLC·QE</strong>
             <span className="brand-caption">{copy.brandCaption}</span>
@@ -88,10 +97,7 @@ function AppFrame() {
           <Menu.Item key="/analysis"><NavMark kind="analysis" /><span>{copy.navAnalysis}</span></Menu.Item>
         </Menu>
 
-        <div className="sidebar-note">
-          <span className="sidebar-orbit" aria-hidden="true"><i /><i /><i /></span>
-          <Text>{copy.sidebarNote}</Text>
-        </div>
+        <div className="sidebar-note"><Text>{copy.sidebarNote}</Text></div>
       </Sider>
 
       <Layout className="workbench-main-layout">
@@ -114,10 +120,10 @@ function AppFrame() {
           </nav>
         </Header>
 
-        <Content className="workbench-content">
+        <Content className="workbench-content" id="main-content" role="main" tabIndex={-1}>
           {apiError ? (
             <section className="service-error" role="alert">
-              <span className="eyebrow"><span className="eyebrow-dot" />LOCAL SERVICE</span>
+              <span className="error-label">LOCAL SERVICE</span>
               <Title heading={1}>{copy.apiUnavailableTitle}</Title>
               <Paragraph>{copy.apiUnavailableDescription}</Paragraph>
               <code>{copy.startCommand}</code>
@@ -140,6 +146,7 @@ function AppFrame() {
         </Content>
       </Layout>
     </Layout>
+    </>
   );
 }
 
@@ -147,11 +154,10 @@ function MobileNavLink({ to, label }: { to: string; label: string }) {
   return <NavLink to={to} end={to === '/'} className={({ isActive }) => isActive ? 'mobile-nav-link is-active' : 'mobile-nav-link'}>{label}</NavLink>;
 }
 
-function PageHeading({ kicker, title, description, action }: { kicker: string; title: string; description: string; action?: ReactNode }) {
+function PageHeading({ title, description, action }: { title: string; description: string; action?: ReactNode }) {
   return (
     <div className="page-title-row">
       <div className="page-title-copy">
-        <span className="eyebrow"><span className="eyebrow-dot" />{kicker}</span>
         <Title heading={1}>{title}</Title>
         <Paragraph>{description}</Paragraph>
       </div>
@@ -160,12 +166,11 @@ function PageHeading({ kicker, title, description, action }: { kicker: string; t
   );
 }
 
-function Metric({ label, value, index }: { label: string; value: number; index: string }) {
+function Metric({ label, value }: { label: string; value: number }) {
   return (
     <div className="metric-item">
-      <span className="metric-index">{index}</span>
-      <strong>{value.toLocaleString()}</strong>
       <span className="metric-label">{label}</span>
+      <strong>{value.toLocaleString()}</strong>
     </div>
   );
 }
@@ -178,32 +183,29 @@ function ModelPath({ copy }: { copy: Messages }) {
     <section className="trace-section" aria-labelledby="trace-heading">
       <div className="section-heading">
         <div>
-          <span className="eyebrow"><span className="eyebrow-dot" />{copy.pathKicker}</span>
           <Title heading={2} id="trace-heading">{copy.pathTitle}</Title>
           <Paragraph>{copy.pathDescription}</Paragraph>
         </div>
         <span className="section-hint">{copy.pathHint}</span>
       </div>
-      <div className="trace-flow" role="group" aria-label={copy.pathTitle}>
-        {copy.modelPath.map((step, index) => (
-          <div className="trace-flow-item" key={step.name}>
+      <ol className="trace-flow" aria-label={copy.pathTitle}>
+            {copy.modelPath.map((step, index) => (
+          <li className="trace-flow-item" key={step.name}>
             <button
               className={'trace-node' + (selected === index ? ' is-active' : '')}
               type="button"
               aria-pressed={selected === index}
               onClick={() => setSelected(index)}
             >
-              <span className="trace-node-index">0{index + 1}</span>
-              <span>{step.name}</span>
-              <span className="trace-node-dot" aria-hidden="true" />
+              <span className="trace-node-name">{step.name}</span>
             </button>
-            {index < copy.modelPath.length - 1 && <span className="trace-link" aria-hidden="true" />}
-          </div>
+            {index < copy.modelPath.length - 1 && <span className={'trace-connector' + (index < selected ? ' is-passed' : '')} aria-hidden="true" />}
+          </li>
         ))}
-      </div>
+      </ol>
       <div className="trace-detail" aria-live="polite">
         <span className="trace-detail-label">{copy.selectedConcept}</span>
-        <p><strong>{active.name}</strong><span>{active.detail}</span></p>
+        <p className="trace-detail-copy" key={active.name}><strong>{active.name}</strong><span>{active.detail}</span></p>
       </div>
     </section>
   );
@@ -213,7 +215,6 @@ function OverviewPage({ meta, copy, onNavigate }: { meta: WorkbenchMeta; copy: M
   return (
     <div className="page-wrap overview-page">
       <PageHeading
-        kicker={copy.overviewKicker}
         title={copy.overviewTitle}
         description={copy.overviewDescription}
         action={<Button className="primary-action" onClick={() => onNavigate('/import')}><span>{copy.importAction}</span><span aria-hidden="true">↗</span></Button>}
@@ -221,9 +222,8 @@ function OverviewPage({ meta, copy, onNavigate }: { meta: WorkbenchMeta; copy: M
 
       <div className="overview-summary">
         <section className="assessment-state" aria-labelledby="assessment-heading">
-          <div className="assessment-mark" aria-hidden="true"><span>?</span></div>
           <div className="assessment-copy">
-            <span className="eyebrow">{copy.assessmentKicker}</span>
+            <span className="assessment-state-label">{copy.assessmentKicker}</span>
             <div className="assessment-title-line">
               <Title heading={2} id="assessment-heading">{copy.unknown}</Title>
               <Tag className="status-tag">{copy.notAssessed}</Tag>
@@ -239,9 +239,9 @@ function OverviewPage({ meta, copy, onNavigate }: { meta: WorkbenchMeta; copy: M
             <Tag className="demo-tag">{copy.bundledLabel}</Tag>
           </div>
           <div className="metric-grid">
-            <Metric label={copy.metricClasses} value={meta.classCount} index="01" />
-            <Metric label={copy.metricProperties} value={meta.propertyCount} index="02" />
-            <Metric label={copy.metricTriples} value={meta.tripleCount} index="03" />
+            <Metric label={copy.metricClasses} value={meta.classCount} />
+            <Metric label={copy.metricProperties} value={meta.propertyCount} />
+            <Metric label={copy.metricTriples} value={meta.tripleCount} />
           </div>
         </section>
       </div>
@@ -251,7 +251,6 @@ function OverviewPage({ meta, copy, onNavigate }: { meta: WorkbenchMeta; copy: M
       <section className="metadata-section" aria-labelledby="metadata-heading">
         <div className="metadata-heading-row">
           <div>
-            <span className="eyebrow"><span className="eyebrow-dot" />{copy.sourceStatusKicker}</span>
             <Title heading={2} id="metadata-heading">{copy.dataTitle}</Title>
           </div>
           <span className="source-caption"><span className="live-dot" />{copy.dataSourceNote}</span>
@@ -284,17 +283,16 @@ function OverviewPage({ meta, copy, onNavigate }: { meta: WorkbenchMeta; copy: M
 function OntologyPage({ meta, copy }: { meta: WorkbenchMeta; copy: Messages }) {
   return (
     <div className="page-wrap secondary-page">
-      <PageHeading kicker={copy.navOntology} title={copy.ontologyTitle} description={copy.ontologyDescription} />
+      <PageHeading title={copy.ontologyTitle} description={copy.ontologyDescription} />
       <div className="model-stats">
-        <Metric label={copy.metricClasses} value={meta.classCount} index="01" />
-        <Metric label={copy.metricProperties} value={meta.propertyCount} index="02" />
-        <Metric label={copy.metricTriples} value={meta.tripleCount} index="03" />
+        <Metric label={copy.metricClasses} value={meta.classCount} />
+        <Metric label={copy.metricProperties} value={meta.propertyCount} />
+        <Metric label={copy.metricTriples} value={meta.tripleCount} />
         <Tag className="candidate-tag">{copy.candidateLabel}</Tag>
       </div>
       <ModelPath copy={copy} />
       <section className="reference-note">
         <div>
-          <span className="eyebrow"><span className="eyebrow-dot" />{copy.ontologyMaterialsKicker}</span>
           <Title heading={2}>{copy.ontologyReviewTitle}</Title>
           <Paragraph>{copy.ontologyReviewDescription}</Paragraph>
         </div>
@@ -307,20 +305,21 @@ function OntologyPage({ meta, copy }: { meta: WorkbenchMeta; copy: Messages }) {
 function ImportPage({ copy }: { copy: Messages }) {
   return (
     <div className="page-wrap secondary-page">
-      <PageHeading kicker={copy.navImport} title={copy.importTitle} description={copy.importDescription} />
+      <PageHeading title={copy.importTitle} description={copy.importDescription} />
       <section className="import-note">
         <div className="import-note-heading">
           <div>
-            <span className="eyebrow"><span className="eyebrow-dot" />{copy.mappingKicker}</span>
             <Title heading={2}>{copy.mappingTitle}</Title>
           </div>
           <Tag className="candidate-tag">{copy.plannedLabel}</Tag>
         </div>
         <Paragraph>{copy.mappingDescription}</Paragraph>
-        <ol className="planned-steps">
-          {copy.importSteps.map((step) => <li key={step}>{step}</li>)}
-        </ol>
-        <div className="no-file-note"><span className="notice-mark" aria-hidden="true">i</span>{copy.noFileNote}</div>
+        <div className="import-plan-layout">
+          <ol className="planned-steps">
+            {copy.importSteps.map((step) => <li key={step}>{step}</li>)}
+          </ol>
+          <aside className="no-file-note">{copy.noFileNote}</aside>
+        </div>
       </section>
     </div>
   );
@@ -329,22 +328,25 @@ function ImportPage({ copy }: { copy: Messages }) {
 function AnalysisPage({ meta, copy }: { meta: WorkbenchMeta; copy: Messages }) {
   return (
     <div className="page-wrap secondary-page">
-      <PageHeading kicker={copy.navAnalysis} title={copy.analysisTitle} description={copy.analysisDescription} />
+      <PageHeading title={copy.analysisTitle} description={copy.analysisDescription} />
       <section className="assessment-report">
-        <div className="report-topline">
-          <span className="eyebrow"><span className="eyebrow-dot" />{copy.assessmentStatusLabel}</span>
-          <Tag className="status-tag">{copy.notAssessed}</Tag>
+        <div className="report-main">
+          <div className="report-summary">
+            <div className="report-topline">
+              <span className="report-status-label">{copy.assessmentStatusLabel}</span>
+              <Tag className="status-tag">{copy.notAssessed}</Tag>
+            </div>
+            <div className="assessment-report-title">
+              <div><Title heading={2}>{copy.unknown}</Title><Text className="report-caption">{copy.analysisExplanation}</Text></div>
+            </div>
+          </div>
+          <dl className="report-facts">
+            <div><dt>{copy.analysisFixtureStatements}</dt><dd>{meta.tripleCount.toLocaleString()}</dd></div>
+            <div><dt>{copy.validationLabel}</dt><dd>{displayValidation(meta.validation, copy)}</dd></div>
+            <div><dt>{copy.evidenceQualification}</dt><dd>{copy.notAvailable}</dd></div>
+          </dl>
         </div>
-        <div className="assessment-report-title">
-          <span className="assessment-mark" aria-hidden="true"><span>?</span></span>
-          <div><Title heading={2}>{copy.unknown}</Title><Text className="report-caption">{copy.analysisExplanation}</Text></div>
-        </div>
-        <dl className="report-facts">
-          <div><dt>{copy.analysisFixtureStatements}</dt><dd>{meta.tripleCount.toLocaleString()}</dd></div>
-          <div><dt>{copy.validationLabel}</dt><dd>{displayValidation(meta.validation, copy)}</dd></div>
-          <div><dt>{copy.evidenceQualification}</dt><dd>{copy.notAvailable}</dd></div>
-        </dl>
-        <div className="unknown-note"><span className="notice-mark" aria-hidden="true">i</span>{copy.unknownExplanation}</div>
+        <p className="unknown-note">{copy.unknownExplanation}</p>
       </section>
     </div>
   );

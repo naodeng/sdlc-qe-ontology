@@ -1,6 +1,7 @@
 export type Locale = 'zh' | 'en';
 
 type MessageSet = {
+  skipToContent: string;
   languageLabel: string;
   navLabel: string;
   navOverview: string;
@@ -81,6 +82,7 @@ export type Messages = MessageSet;
 
 export const messages: Record<Locale, MessageSet> = {
   zh: {
+    skipToContent: '跳到主要内容',
     languageLabel: '界面语言',
     navLabel: '主导航',
     navOverview: '项目总览',
@@ -169,6 +171,7 @@ export const messages: Record<Locale, MessageSet> = {
     startCommand: 'make setup && make dev',
   },
   en: {
+    skipToContent: 'Skip to main content',
     languageLabel: 'Interface language',
     navLabel: 'Main navigation',
     navOverview: 'Overview',
