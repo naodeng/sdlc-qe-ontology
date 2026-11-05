@@ -134,8 +134,7 @@ components:
         name:
           type: string
           minLength: 1
-          maxLength: 80
-          description: Trimmed by the server; control characters and lone surrogate code points are rejected.
+          description: The server trims surrounding whitespace, then requires 1–80 Unicode code points; control characters and lone surrogate code points are rejected.
     Workspace:
       type: object
       additionalProperties: false

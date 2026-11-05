@@ -1,6 +1,7 @@
 import errno
 import json
 import os
+import stat
 from importlib import import_module
 from pathlib import Path
 from uuid import UUID
@@ -126,6 +127,53 @@ def test_create_writes_v1_manifest_and_returns_workspace(tmp_path: Path) -> None
         entry.name.startswith(".staging-")
         for entry in (tmp_path / "data/workspaces").iterdir()
     )
+
+
+@pytest.mark.skipif(os.name == "nt", reason="directory fsync is POSIX-specific")
+def test_create_fsyncs_parents_of_new_storage_directories(tmp_path: Path, monkeypatch) -> None:
+    module = _load_store_module()
+    data_root = tmp_path / "new-parent" / "nested" / "data"
+    real_fsync = os.fsync
+    real_mkdir = os.mkdir
+    events: list[tuple[str, object]] = []
+
+    def record_fsync(descriptor: int) -> None:
+        metadata = os.fstat(descriptor)
+        if stat.S_ISDIR(metadata.st_mode):
+            events.append(("fsync", (metadata.st_dev, metadata.st_ino)))
+        real_fsync(descriptor)
+
+    def record_mkdir(path, mode=0o777, *, dir_fd=None) -> None:
+        real_mkdir(path, mode, dir_fd=dir_fd)
+        candidate = Path(path)
+        created_data_dir = candidate in {
+            tmp_path / "new-parent",
+            tmp_path / "new-parent/nested",
+            data_root,
+        }
+        if created_data_dir or (dir_fd is not None and candidate == Path("workspaces")):
+            parent = os.fstat(dir_fd) if dir_fd is not None else candidate.parent.stat()
+            parent_identity = (parent.st_dev, parent.st_ino)
+            label = str(candidate)
+            events.append(("mkdir", (label, parent_identity)))
+
+    monkeypatch.setattr(module.os, "fsync", record_fsync)
+    monkeypatch.setattr(module.os, "mkdir", record_mkdir)
+    module.FilesystemWorkspaceStore(data_root).create("Project")
+
+    new_data_dirs = [
+        tmp_path / "new-parent",
+        tmp_path / "new-parent/nested",
+        data_root,
+        data_root / "workspaces",
+    ]
+    for directory in new_data_dirs:
+        parent = directory.parent.stat()
+        parent_identity = (parent.st_dev, parent.st_ino)
+        mkdir_event = ("mkdir", ("workspaces" if directory.name == "workspaces" else str(directory), parent_identity))
+        mkdir_index = events.index(mkdir_event)
+        fsync_index = events.index(("fsync", parent_identity), mkdir_index + 1)
+        assert mkdir_index < fsync_index
 
 
 def test_create_retries_uuid_collision_without_overwriting(tmp_path: Path, monkeypatch) -> None:

@@ -219,6 +219,20 @@ def test_create_accepts_allowed_origin(tmp_path: Path) -> None:
     assert response.status_code == 201
 
 
+def test_create_trims_before_enforcing_workspace_name_limit(tmp_path: Path) -> None:
+    name = "a" * 80
+    response = request(
+        _app(tmp_path / "workspace-data"),
+        "POST",
+        "/api/v1/workspaces",
+        headers={"origin": "http://127.0.0.1:5174"},
+        json_body={"name": f"  {name}  "},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["name"] == name
+
+
 def test_untrusted_host_is_rejected_for_workspace_routes(tmp_path: Path) -> None:
     response = request(
         _app(tmp_path / "workspace-data"),

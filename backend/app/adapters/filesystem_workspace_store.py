@@ -225,9 +225,28 @@ def _ensure_directory(path: Path) -> None:
             path.mkdir(mode=0o700)
         except FileExistsError:
             pass
+        if os.name != "nt":
+            _fsync_directory_path(parent)
         metadata = path.lstat()
     if not stat.S_ISDIR(metadata.st_mode):
         raise WorkspaceStorageUnavailable
+
+
+def _fsync_directory_path(path: Path) -> None:
+    """Persist a directory entry by syncing its parent directory on POSIX."""
+    descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        named = path.lstat()
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISDIR(named.st_mode)
+            or named.st_dev != opened.st_dev
+            or named.st_ino != opened.st_ino
+        ):
+            raise OSError(errno.ELOOP, "directory changed while syncing")
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def _path_exists(path: Path) -> bool:
@@ -1081,6 +1100,7 @@ class FilesystemWorkspaceStore:
                 os.mkdir("workspaces", mode=0o700, dir_fd=data_fd)
             except FileExistsError:
                 pass
+            os.fsync(data_fd)
         try:
             metadata = os.stat("workspaces", dir_fd=data_fd, follow_symlinks=False)
         except FileNotFoundError:
