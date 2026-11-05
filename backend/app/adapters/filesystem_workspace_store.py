@@ -51,6 +51,34 @@ _SUPPORTS_DIRECTORY_HANDLES = (
 _RFC3339_UTC = re.compile(
     r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|\+00:00)$"
 )
+_WINDOWS_FILE_ATTRIBUTE_DIRECTORY = 0x10
+_WINDOWS_FILE_ATTRIBUTE_REPARSE_POINT = 0x400
+_WINDOWS_FILE_SHARE_READ = 0x00000001
+_WINDOWS_FILE_SHARE_WRITE = 0x00000002
+_WINDOWS_FILE_SHARE_DELETE = 0x00000004
+_WINDOWS_FILE_FLAG_BACKUP_SEMANTICS = 0x02000000
+_WINDOWS_FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000
+_WINDOWS_FILE_READ_ATTRIBUTES = 0x00000080
+_WINDOWS_DELETE = 0x00010000
+
+
+class _WindowsFileTime(ctypes.Structure):
+    _fields_ = [("low", ctypes.c_uint32), ("high", ctypes.c_uint32)]
+
+
+class _WindowsFileInformation(ctypes.Structure):
+    _fields_ = [
+        ("attributes", ctypes.c_uint32),
+        ("creation_time", _WindowsFileTime),
+        ("access_time", _WindowsFileTime),
+        ("write_time", _WindowsFileTime),
+        ("volume_serial", ctypes.c_uint32),
+        ("file_size_high", ctypes.c_uint32),
+        ("file_size_low", ctypes.c_uint32),
+        ("number_of_links", ctypes.c_uint32),
+        ("file_index_high", ctypes.c_uint32),
+        ("file_index_low", ctypes.c_uint32),
+    ]
 
 
 class _InvalidManifest(ValueError):
@@ -257,24 +285,82 @@ def _rename_directory_no_replace(
         raise OSError(error, os.strerror(error), destination_name)
 
 
-def _open_windows_directory_lock(path: Path) -> int:
-    class _FileTime(ctypes.Structure):
-        _fields_ = [("low", ctypes.c_uint32), ("high", ctypes.c_uint32)]
+def _windows_file_information(handle: int) -> _WindowsFileInformation:
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    get_info = kernel32.GetFileInformationByHandle
+    get_info.argtypes = [ctypes.c_void_p, ctypes.POINTER(_WindowsFileInformation)]
+    get_info.restype = ctypes.c_int
+    information = _WindowsFileInformation()
+    if not get_info(ctypes.c_void_p(handle), ctypes.byref(information)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    return information
 
-    class _FileInformation(ctypes.Structure):
-        _fields_ = [
-            ("attributes", ctypes.c_uint32),
-            ("creation_time", _FileTime),
-            ("access_time", _FileTime),
-            ("write_time", _FileTime),
-            ("volume_serial", ctypes.c_uint32),
-            ("file_size_high", ctypes.c_uint32),
-            ("file_size_low", ctypes.c_uint32),
-            ("number_of_links", ctypes.c_uint32),
-            ("file_index_high", ctypes.c_uint32),
-            ("file_index_low", ctypes.c_uint32),
-        ]
 
+def _windows_file_identity(handle: int) -> tuple[int, int, int]:
+    information = _windows_file_information(handle)
+    return (
+        information.volume_serial,
+        information.file_index_high,
+        information.file_index_low,
+    )
+
+
+def _open_windows_directory_lock(
+    path: Path,
+    *,
+    allow_delete_sharing: bool = False,
+    desired_access: int = _WINDOWS_FILE_READ_ATTRIBUTES,
+) -> int:
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    create_file = kernel32.CreateFileW
+    create_file.argtypes = [
+        ctypes.c_wchar_p,
+        ctypes.c_uint32,
+        ctypes.c_uint32,
+        ctypes.c_void_p,
+        ctypes.c_uint32,
+        ctypes.c_uint32,
+        ctypes.c_void_p,
+    ]
+    create_file.restype = ctypes.c_void_p
+    share_mode = _WINDOWS_FILE_SHARE_READ | _WINDOWS_FILE_SHARE_WRITE
+    if allow_delete_sharing:
+        share_mode |= _WINDOWS_FILE_SHARE_DELETE
+    handle = create_file(
+        str(path),
+        desired_access,
+        share_mode,
+        None,
+        3,  # OPEN_EXISTING
+        _WINDOWS_FILE_FLAG_BACKUP_SEMANTICS
+        | _WINDOWS_FILE_FLAG_OPEN_REPARSE_POINT,
+        None,
+    )
+    if handle == ctypes.c_void_p(-1).value:
+        raise ctypes.WinError(ctypes.get_last_error())
+
+    try:
+        information = _windows_file_information(int(handle))
+        if (
+            not information.attributes & _WINDOWS_FILE_ATTRIBUTE_DIRECTORY
+            or information.attributes & _WINDOWS_FILE_ATTRIBUTE_REPARSE_POINT
+        ):
+            raise OSError(errno.ELOOP, "storage path is not a plain directory")
+    except BaseException:
+        _close_windows_directory_lock(int(handle))
+        raise
+    return int(handle)
+
+
+def _close_windows_directory_lock(handle: int) -> None:
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+    kernel32.CloseHandle.restype = ctypes.c_int
+    if not kernel32.CloseHandle(ctypes.c_void_p(handle)):
+        raise ctypes.WinError(ctypes.get_last_error())
+
+
+def _read_windows_file(path: Path) -> bytes:
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     create_file = kernel32.CreateFileW
     create_file.argtypes = [
@@ -289,40 +375,136 @@ def _open_windows_directory_lock(path: Path) -> int:
     create_file.restype = ctypes.c_void_p
     handle = create_file(
         str(path),
-        0x00000080,  # FILE_READ_ATTRIBUTES
-        0x00000003,  # FILE_SHARE_READ | FILE_SHARE_WRITE; deny delete/rename while open
+        0x80000000 | _WINDOWS_FILE_READ_ATTRIBUTES,  # GENERIC_READ
+        _WINDOWS_FILE_SHARE_READ,
         None,
         3,  # OPEN_EXISTING
-        0x02000000 | 0x00200000,  # FILE_FLAG_BACKUP_SEMANTICS | OPEN_REPARSE_POINT
+        _WINDOWS_FILE_FLAG_OPEN_REPARSE_POINT,
         None,
     )
     if handle == ctypes.c_void_p(-1).value:
         raise ctypes.WinError(ctypes.get_last_error())
 
-    get_info = kernel32.GetFileInformationByHandle
-    get_info.argtypes = [ctypes.c_void_p, ctypes.POINTER(_FileInformation)]
-    get_info.restype = ctypes.c_int
-    information = _FileInformation()
-    if not get_info(handle, ctypes.byref(information)):
-        error = ctypes.WinError(ctypes.get_last_error())
-        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
-        kernel32.CloseHandle.restype = ctypes.c_int
-        kernel32.CloseHandle(handle)
-        raise error
-    if not information.attributes & 0x10 or information.attributes & 0x400:
-        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
-        kernel32.CloseHandle.restype = ctypes.c_int
-        kernel32.CloseHandle(handle)
-        raise OSError("storage root is not a plain directory")
-    return int(handle)
+    try:
+        handle_value = int(handle)
+        information = _windows_file_information(handle_value)
+        if (
+            information.attributes & _WINDOWS_FILE_ATTRIBUTE_REPARSE_POINT
+            or information.attributes & _WINDOWS_FILE_ATTRIBUTE_DIRECTORY
+        ):
+            raise _InvalidManifest("manifest is not a plain file")
+        size = (information.file_size_high << 32) | information.file_size_low
+        if size > MAX_MANIFEST_BYTES:
+            raise _InvalidManifest("manifest too large")
+
+        read_file = kernel32.ReadFile
+        read_file.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_uint32,
+            ctypes.POINTER(ctypes.c_uint32),
+            ctypes.c_void_p,
+        ]
+        read_file.restype = ctypes.c_int
+        chunks: list[bytes] = []
+        total = 0
+        while total <= MAX_MANIFEST_BYTES:
+            capacity = MAX_MANIFEST_BYTES + 1 - total
+            buffer = ctypes.create_string_buffer(capacity)
+            bytes_read = ctypes.c_uint32()
+            if not read_file(
+                ctypes.c_void_p(handle_value),
+                buffer,
+                capacity,
+                ctypes.byref(bytes_read),
+                None,
+            ):
+                raise ctypes.WinError(ctypes.get_last_error())
+            if bytes_read.value == 0:
+                break
+            chunks.append(buffer.raw[: bytes_read.value])
+            total += bytes_read.value
+        raw = b"".join(chunks)
+        if len(raw) > MAX_MANIFEST_BYTES:
+            raise _InvalidManifest("manifest too large")
+        return raw
+    finally:
+        _close_windows_directory_lock(int(handle))
 
 
-def _close_windows_directory_lock(handle: int) -> None:
+def _set_windows_delete_disposition(handle: int) -> None:
+    class _FileDispositionInfo(ctypes.Structure):
+        _fields_ = [("delete_file", ctypes.c_ubyte)]
+
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
-    kernel32.CloseHandle.restype = ctypes.c_int
-    if not kernel32.CloseHandle(ctypes.c_void_p(handle)):
+    set_info = kernel32.SetFileInformationByHandle
+    set_info.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32]
+    set_info.restype = ctypes.c_int
+    information = _FileDispositionInfo(1)
+    if not set_info(
+        ctypes.c_void_p(handle),
+        4,  # FileDispositionInfo
+        ctypes.byref(information),
+        ctypes.sizeof(information),
+    ):
         raise ctypes.WinError(ctypes.get_last_error())
+
+
+def _remove_windows_staging_directory(
+    path: Path,
+    expected_identity: tuple[int, int, int],
+) -> None:
+    directory_handle: int | None = None
+    manifest_handle: int | None = None
+    try:
+        directory_handle = _open_windows_directory_lock(
+            path,
+            desired_access=_WINDOWS_FILE_READ_ATTRIBUTES | _WINDOWS_DELETE,
+        )
+        if _windows_file_identity(directory_handle) != expected_identity:
+            return
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        create_file = kernel32.CreateFileW
+        create_file.argtypes = [
+            ctypes.c_wchar_p,
+            ctypes.c_uint32,
+            ctypes.c_uint32,
+            ctypes.c_void_p,
+            ctypes.c_uint32,
+            ctypes.c_uint32,
+            ctypes.c_void_p,
+        ]
+        create_file.restype = ctypes.c_void_p
+        handle = create_file(
+            str(path / MANIFEST_FILE),
+            _WINDOWS_DELETE | _WINDOWS_FILE_READ_ATTRIBUTES,
+            _WINDOWS_FILE_SHARE_READ | _WINDOWS_FILE_SHARE_WRITE,
+            None,
+            3,  # OPEN_EXISTING
+            _WINDOWS_FILE_FLAG_OPEN_REPARSE_POINT,
+            None,
+        )
+        if handle != ctypes.c_void_p(-1).value:
+            manifest_handle = int(handle)
+            information = _windows_file_information(manifest_handle)
+            if (
+                information.attributes & _WINDOWS_FILE_ATTRIBUTE_REPARSE_POINT
+                or information.attributes & _WINDOWS_FILE_ATTRIBUTE_DIRECTORY
+            ):
+                return
+            _set_windows_delete_disposition(manifest_handle)
+            _close_windows_directory_lock(manifest_handle)
+            manifest_handle = None
+
+        _set_windows_delete_disposition(directory_handle)
+    except OSError:
+        pass
+    finally:
+        if manifest_handle is not None:
+            _close_windows_directory_lock(manifest_handle)
+        if directory_handle is not None:
+            _close_windows_directory_lock(directory_handle)
 
 
 class FilesystemWorkspaceStore:
@@ -401,6 +583,7 @@ class FilesystemWorkspaceStore:
                         created_at,
                     )
                     manifest_stat = self._write_manifest_at(staging_fd, manifest)
+                    os.fsync(staging_fd)
                     try:
                         _rename_directory_no_replace(
                             workspaces_fd,
@@ -524,25 +707,82 @@ class FilesystemWorkspaceStore:
                     raise
 
                 try:
+                    directory_lock: int | None = None
+                    identity_handle: int | None = None
+                    final_lock: int | None = None
+                    expected_identity: tuple[int, int, int] | None = None
+                    published = False
                     created_at = _format_created_at(datetime.now(timezone.utc))
                     manifest = _new_workspace_manifest(
                         workspace_id,
                         normalized_name,
                         created_at,
                     )
+
+                    directory_lock = _open_windows_directory_lock(temp_dir)
+                    identity_handle = _open_windows_directory_lock(
+                        temp_dir,
+                        allow_delete_sharing=True,
+                    )
+                    expected_identity = _windows_file_identity(directory_lock)
+                    if _windows_file_identity(identity_handle) != expected_identity:
+                        raise OSError(errno.ELOOP, "staging directory changed")
+
                     self._write_manifest(temp_dir / MANIFEST_FILE, manifest)
+                    _close_windows_directory_lock(directory_lock)
+                    directory_lock = None
                     try:
                         os.rename(temp_dir, final_dir)
                     except FileExistsError:
-                        self._remove_owned_temp_dir(temp_dir)
+                        if expected_identity is not None:
+                            _remove_windows_staging_directory(
+                                temp_dir,
+                                expected_identity,
+                            )
                         _remove_reservation(reservation)
                         continue
+                    published = True
+
+                    final_lock = _open_windows_directory_lock(final_dir)
+                    if _windows_file_identity(final_lock) != expected_identity:
+                        raise OSError(errno.ELOOP, "published directory changed")
+                    workspace = self._read_workspace(final_dir, workspace_id)
+                    if workspace != Workspace(workspace_id, normalized_name, created_at):
+                        raise OSError(errno.EINVAL, "published manifest changed")
                     _remove_reservation(reservation)
-                    return Workspace(workspace_id, normalized_name, created_at)
+                    return workspace
                 except OSError:
-                    self._remove_owned_temp_dir(temp_dir)
+                    if final_lock is not None:
+                        _close_windows_directory_lock(final_lock)
+                        final_lock = None
+                    if directory_lock is not None:
+                        _close_windows_directory_lock(directory_lock)
+                        directory_lock = None
+                    if expected_identity is not None:
+                        _remove_windows_staging_directory(
+                            final_dir if published else temp_dir,
+                            expected_identity,
+                        )
                     _remove_reservation(reservation)
                     raise WorkspaceStorageUnavailable from None
+                except _InvalidManifest:
+                    if final_lock is not None:
+                        _close_windows_directory_lock(final_lock)
+                        final_lock = None
+                    if directory_lock is not None:
+                        _close_windows_directory_lock(directory_lock)
+                        directory_lock = None
+                    if expected_identity is not None:
+                        _remove_windows_staging_directory(
+                            final_dir if published else temp_dir,
+                            expected_identity,
+                        )
+                    _remove_reservation(reservation)
+                    raise WorkspaceStorageUnavailable from None
+                finally:
+                    for handle in (final_lock, directory_lock, identity_handle):
+                        if handle is not None:
+                            _close_windows_directory_lock(handle)
 
             raise WorkspaceStorageUnavailable
         except WorkspaceStorageUnavailable:
@@ -1003,6 +1243,21 @@ class FilesystemWorkspaceStore:
         workspaces_fd: int | None = None,
     ) -> Workspace:
         try:
+            if os.name == "nt" and directory_fd is None:
+                try:
+                    directory_handle = _open_windows_directory_lock(directory)
+                except OSError as error:
+                    if error.errno in {errno.ELOOP, errno.ENOTDIR, errno.ENOENT}:
+                        raise _InvalidManifest("workspace directory unavailable") from None
+                    raise
+                try:
+                    raw = _read_windows_file(directory / MANIFEST_FILE)
+                except FileNotFoundError:
+                    raise _InvalidManifest("manifest missing") from None
+                finally:
+                    _close_windows_directory_lock(directory_handle)
+                return _parse_manifest(raw, workspace_id)
+
             if directory_fd is not None:
                 metadata = os.stat(
                     MANIFEST_FILE,
@@ -1018,6 +1273,8 @@ class FilesystemWorkspaceStore:
                 raise _InvalidManifest("manifest unavailable")
 
             flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            if os.name != "nt" and hasattr(os, "O_NONBLOCK"):
+                flags |= os.O_NONBLOCK
             try:
                 if directory_fd is None:
                     descriptor = os.open(directory / MANIFEST_FILE, flags)

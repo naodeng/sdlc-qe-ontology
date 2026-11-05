@@ -183,6 +183,30 @@ def test_create_rejects_untrusted_origin(tmp_path: Path) -> None:
     assert response.json() == {"detail": {"code": "origin_not_allowed"}}
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/health",
+        "/api/v1/meta",
+        "/api/v1/workspaces",
+        "/api/v1/workspaces/6f35fb35-d617-44f2-926c-4029da7d7007",
+    ],
+)
+def test_get_rejects_untrusted_origin_with_documented_error(
+    tmp_path: Path,
+    path: str,
+) -> None:
+    response = request(
+        _app(tmp_path / "workspace-data"),
+        "GET",
+        path,
+        headers={"origin": "https://attacker.example"},
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": {"code": "origin_not_allowed"}}
+
+
 def test_create_accepts_allowed_origin(tmp_path: Path) -> None:
     response = request(
         _app(tmp_path / "workspace-data"),

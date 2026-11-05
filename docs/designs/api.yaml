@@ -12,6 +12,8 @@ paths:
       responses:
         '200':
           description: API process health
+        '403':
+          $ref: '#/components/responses/OriginRejected'
   /api/v1/meta:
     get:
       operationId: getMeta
@@ -22,6 +24,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkbenchMeta'
+        '403':
+          $ref: '#/components/responses/OriginRejected'
   /api/v1/workspaces:
     get:
       operationId: listWorkspaces
@@ -34,6 +38,8 @@ paths:
                 $ref: '#/components/schemas/WorkspaceList'
         '503':
           $ref: '#/components/responses/WorkspaceStorageUnavailable'
+        '403':
+          $ref: '#/components/responses/OriginRejected'
     post:
       operationId: createWorkspace
       parameters:
@@ -91,10 +97,12 @@ paths:
           $ref: '#/components/responses/WorkspaceManifestUnavailable'
         '503':
           $ref: '#/components/responses/WorkspaceStorageUnavailable'
+        '403':
+          $ref: '#/components/responses/OriginRejected'
 components:
   responses:
     OriginRejected:
-      description: The Origin header is missing or is not in the local allowlist.
+      description: The Origin header is required when specified by the operation and must match the local allowlist.
       content:
         application/json:
           schema:

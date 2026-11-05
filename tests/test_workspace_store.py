@@ -649,6 +649,37 @@ def test_list_reports_no_follow_eloop_as_corrupt_and_continues(
     assert corrupt_summary.status is WorkspaceStatus.CORRUPT
 
 
+def test_get_rejects_manifest_replaced_with_fifo_without_blocking(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    if os.name == "nt" or not hasattr(os, "mkfifo"):
+        pytest.skip("FIFO replacement is a POSIX-only race regression")
+    module = _load_store_module()
+    store = module.FilesystemWorkspaceStore(tmp_path / "data")
+    workspace = store.create("Project")
+    manifest_path = (
+        tmp_path / "data/workspaces" / workspace.workspace_id / "manifest.json"
+    )
+    real_open = os.open
+    replaced = False
+
+    def open_after_fifo_swap(path, flags, *args, **kwargs):
+        nonlocal replaced
+        if path == "manifest.json" and kwargs.get("dir_fd") is not None and not replaced:
+            manifest_path.unlink()
+            os.mkfifo(manifest_path)
+            replaced = True
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(module.os, "open", open_after_fifo_swap)
+
+    with pytest.raises(WorkspaceUnavailable):
+        store.get(workspace.workspace_id)
+
+    assert replaced
+
+
 def test_store_errors_never_include_storage_path(tmp_path: Path) -> None:
     module = _load_store_module()
     data_root = tmp_path / "not-a-directory"

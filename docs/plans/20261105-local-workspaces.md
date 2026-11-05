@@ -1,5 +1,5 @@
 # Plan: 20261105-local-workspaces
-Status: Approved; implementation completed 2026-11-05. Playwright E2E is blocked by the macOS Codex sandbox.
+Status: Approved; implementation completed 2026-11-05. The first Playwright attempt was blocked by the macOS Codex sandbox; the follow-up isolated run passed all 3 tests outside it.
 Linked Requirement: REQ-WORKSPACE-001
 
 **Goal:** Deliver local workspace creation, listing, and read-only details, without implying that the bundled demo belongs to an empty workspace.
@@ -146,7 +146,7 @@ Linked Requirement: REQ-WORKSPACE-001
 - [x] **Step 2: Run RED:** `make e2e` was attempted. Playwright could not launch Chromium because macOS sandbox denied `MachPortRendezvousServer`; all three tests stopped before their first page assertion, so this run did not establish a UI red state.
 - [x] **Step 3: Implement** typed API calls, Chinese/English navigation and pages, accessible create form, empty/corrupt states, and explicit demo/workspace separation. `npm --workspace frontend run build` passed; manual Ego QA covered create/list/detail, keyboard submission, corruption display, both locales, and 390px/1440px layout with no horizontal overflow.
 - [x] **Step 4: Isolate E2E data:** `scripts/e2e-run.sh` creates a temp data root, passes it as `SDLC_QE_DATA_DIR`, and removes only that root on exit. `bash -n` and an isolated stub-runner lifecycle check passed.
-- [ ] **Step 5: Run GREEN:** `make e2e` is blocked by the observed macOS sandbox Chromium `MachPortRendezvousServer: Permission denied (1100)` failure. No sandbox-external retry was made.
+- [x] **Step 5: Run GREEN:** the initial `make e2e` attempt was blocked by the observed macOS sandbox Chromium `MachPortRendezvousServer: Permission denied (1100)` failure. The later isolated command `env -u SDLC_QE_DATA_DIR -u SDLC_QE_E2E_DATA_ROOT -u E2E_FRONTEND_PORT npm --workspace frontend run e2e` passed 3/3 outside the sandbox; details are in the current QA report.
 
 ### Task 5: Documentation and full verification
 
@@ -155,7 +155,7 @@ Linked Requirement: REQ-WORKSPACE-001
 - Create: `docs/qa/workspaces-verification-20261105.md`
 - Modify: `PRODUCT.md`, `README.md`, `README.en.md`, `README.zh-CN.md`, this plan
 
-- [x] **Step 1: Document** implemented scope, platform data paths/override, no-import/no-snapshot limit, JSON-first follow-up, exact current command results, and the blocked browser gate in the requirement, baseline, README files, API contract, QA index, and run report.
+- [x] **Step 1: Document** implemented scope, platform data paths/override, no-import/no-snapshot limit, JSON-first follow-up, exact current command results, and the browser startup investigation in the requirement, baseline, README files, API contract, QA index, and run report.
 - [x] **Step 2: Run full verification:** `./scripts/verify.sh` passed on 2026-11-05: Ruff; 72 pytest tests and 58 subtests; SPARQL CQs; SHACL positive/negative fixtures; mapping schema checks; TypeScript; and Vite production build.
 - [x] **Step 3: Inspect final diff and status:** `git diff --check` passed; `git status --short --branch` showed only the intended workspace implementation/docs changes on `main...origin/main`. No commit, push, or merge was performed.
 
@@ -178,6 +178,6 @@ The task-specific commands above provide the RED/GREEN evidence. Final gates are
 
 ## 人工审批与执行结果
 
-Strict review found and corrected these issues before implementation: the original plan lacked executable task boundaries and named tests; its default path was not platform-appropriate; corrupt-manifest response fields and HTTP statuses were underspecified; E2E data isolation was missing; the shell could mislabel the bundled example as the active workspace; and it placed product WS-01 status in the engineering-only backlog. The plan now freezes those decisions and is approved under the user's instruction to execute if the strict review finds it sound. Native execution is authorized. No commits, pushes, merges, or cleanup of existing user data are authorized or planned.
+Strict review found and corrected these issues before implementation: the original plan lacked executable task boundaries and named tests; its default path was not platform-appropriate; corrupt-manifest response fields and HTTP statuses were underspecified; E2E data isolation was missing; the shell could mislabel the bundled example as the active workspace; and it placed product WS-01 status in the engineering-only backlog. The plan was approved under the user's instruction to execute if the strict review found it sound. At approval time, no commits, pushes, merges, or cleanup of existing user data were authorized; the user later explicitly requested PR submission and code review.
 
-Implementation remains phase 1 only. Local workspace management is complete. The Playwright gate is explicitly `blocked` in this macOS sandbox; the manual Ego checks and production build do not count as E2E evidence.
+Implementation remains phase 1 only. Local workspace management is complete. The first Playwright attempt was blocked in the macOS sandbox; the isolated follow-up passed all 3 browser tests outside the sandbox. Manual Ego checks and the production build are not counted as E2E evidence.
