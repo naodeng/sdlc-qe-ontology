@@ -2,7 +2,7 @@
 
 A local-first workbench for tracing software delivery and quality evidence.
 
-**Current status:** the repository foundation is runnable. The UI defaults to Simplified Chinese and includes an English switch. The UI and API currently read only the bundled candidate ontology and example fixture. The v0.1.0 real-data import, mapping approval, snapshot publishing, and quality assessment workflows are not implemented. Demo data is not a validation result.
+**Current status:** the UI defaults to Simplified Chinese and includes an English switch. Users can create, list, and open local workspaces in a read-only detail view; bundled example data remains a separate read-only source. Restricted JSON is the selected first importer, but import, mapping approval, snapshot publishing, and quality assessment are not implemented. Demo data is not a validation result.
 
 ## Quick start
 
@@ -14,6 +14,8 @@ make dev
 ~~~
 
 Open the local workbench at http://127.0.0.1:5174. Local API docs are at http://127.0.0.1:8000/api/docs.
+
+Workspace data stays in the API user's local data directory: macOS defaults to `~/Library/Application Support/SDLC-QE Ontology Workbench`, Windows to `%LOCALAPPDATA%/SDLC-QE Ontology Workbench`, and other systems use `$XDG_DATA_HOME/sdlc-qe-ontology-workbench` or `~/.local/share/sdlc-qe-ontology-workbench`. Set `SDLC_QE_DATA_DIR` to override the location; relative paths resolve from the API process working directory and `~` is expanded. Startup and read requests do not create the data directory.
 
 Run the Python, ontology, mapping-schema, and frontend build gates:
 
@@ -31,7 +33,8 @@ cd .. && make e2e
 ## Included in the bootstrap
 
 - React + TypeScript + Vite + Arco Design React workbench shell.
-- Read-only local FastAPI health and metadata API.
+- Local FastAPI health, metadata, and workspace APIs; only explicit workspace creation writes to the local data directory.
+- Local workspace creation, listing, and read-only details backed by strictly validated manifests and atomic directory publication.
 - RDFLib ontology adapter; local services bind to 127.0.0.1.
 - Candidate ontology, SHACL positive/negative fixtures, SPARQL competency queries, and mapping profile schema.
 - Python, ontology, schema, and frontend build gates; a Playwright Chromium smoke test; and a GitHub Actions workflow.
@@ -39,8 +42,8 @@ cd .. && make e2e
 
 ## MVP work not implemented yet
 
-- Create, open, and switch local workspaces.
-- Import CSV, JSON, or controlled RDF and preview source fields.
+- Global active-workspace selection and a single-writer lock before changing existing workspace data.
+- The restricted JSON first importer (profile still open), followed by CSV/controlled RDF import and source-field preview.
 - Visual mapping editor, explicit human confirmation, and approval invalidation.
 - Data preflight, complete SHACL/policy validation, and atomic immutable snapshot activation.
 - Evidence qualification and source-linked quality reports.
@@ -48,6 +51,8 @@ cd .. && make e2e
 ## Documentation
 
 - [Product and implementation baseline](docs/designs/current-baseline.md)
+- [Local workspace requirement and implementation plan](docs/features/REQ-WORKSPACE-001-local-workspaces.md)
+- [Latest workspace verification evidence](docs/qa/workspace-storage-race-hardening-20261105.md)
 - [Repository bootstrap plan](docs/plans/20261104-repository-bootstrap.md)
 - [Engineering standards](docs/standards/README.md)
 - [Implemented API contract](docs/designs/api.yaml)

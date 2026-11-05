@@ -2,13 +2,14 @@
 
 Trace each requirement to a test case, reproducible command, current run report, and gate state. `not_run` and `blocked` are not `passed`.
 
-Current bootstrap gates:
+Current verification report: [`workspace-storage-race-hardening-20261105.md`](workspace-storage-race-hardening-20261105.md).
 
-- Python/API, SPARQL CQ, and SHACL positive/negative fixtures: `scripts/verify_baseline.py`.
-- Mapping profile schema positive/negative checks: `scripts/validate_mapping_schema.py`.
-- Python lint and frontend build: `scripts/verify.sh`.
-- Browser smoke test: `scripts/e2e-run.sh`.
+Current workspace gates:
 
-Latest run record: [`bootstrap-verification-20261104.md`](bootstrap-verification-20261104.md). The corrected Playwright runner has not yet had a successful E2E run; do not treat the manual Ego preview as an E2E pass.
+- `./scripts/verify.sh` passed on 2026-11-05: Ruff, 75 pytest tests and 58 subtests, SPARQL CQs, SHACL positive/negative fixtures, mapping profile schema, TypeScript, and Vite build.
+- Playwright browser E2E: `make e2e` passed all 3 tests after the runner selected an available loopback port.
+- `scripts/e2e-run.sh` isolates and removes its temporary `SDLC_QE_DATA_DIR`; the actual Playwright run completed and cleaned its test data.
+
+Historical bootstrap run record: [`bootstrap-verification-20261104.md`](bootstrap-verification-20261104.md). Historical results do not establish the current checkout's status.
 
 Test code lives in `tests/` and `e2e/tests/`. This directory holds case descriptions and evidence indexes; current-run results must be recorded separately from the historical logs in `evidence/`.

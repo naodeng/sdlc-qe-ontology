@@ -5,13 +5,23 @@ import { defineConfig, devices } from '@playwright/test';
 const frontendDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(frontendDirectory, '..');
 const python = path.join(repositoryRoot, '.venv/bin/python');
+const frontendPortValue = process.env.E2E_FRONTEND_PORT ?? '5174';
+const frontendPort = Number(frontendPortValue);
+if (
+  !/^[1-9]\d{0,4}$/.test(frontendPortValue) ||
+  frontendPort > 65535 ||
+  !Number.isInteger(frontendPort)
+) {
+  throw new Error('E2E_FRONTEND_PORT must be an integer from 1 to 65535');
+}
+const frontendOrigin = `http://127.0.0.1:${frontendPort}`;
 
 export default defineConfig({
   testDir: path.join(repositoryRoot, 'e2e/tests'),
   fullyParallel: true,
   reporter: 'list',
   use: {
-    baseURL: 'http://127.0.0.1:5174',
+    baseURL: frontendOrigin,
     trace: 'retain-on-failure',
     ...devices['Desktop Chrome'],
   },
@@ -24,9 +34,9 @@ export default defineConfig({
       timeout: 30_000,
     },
     {
-      command: 'npm run dev -- --host 127.0.0.1',
+      command: `npm run dev -- --host 127.0.0.1 --port ${frontendPort} --strictPort`,
       cwd: frontendDirectory,
-      url: 'http://127.0.0.1:5174',
+      url: frontendOrigin,
       reuseExistingServer: false,
       timeout: 30_000,
     },

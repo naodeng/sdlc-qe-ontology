@@ -30,7 +30,8 @@ Users run the workbench locally, start with bundled example data, and (in the pl
 
 - Accepted MVP direction: local project data import for CSV, JSON, or a controlled RDF profile.
 - Accepted mapping direction: standard templates plus visual field mapping and explicit human confirmation (PRODUCT-ADR-008/009).
-- Import validation, evidence qualification, and snapshot activation are product scope; only the local shell and read-only metadata slice are implemented today.
+- Implementation order selected by the product owner on 2026-11-05: implement the restricted JSON importer first. Its exact input profile and limits remain open for a follow-up plan; this does not remove CSV or controlled RDF from the MVP scope.
+- Import validation, evidence qualification, and snapshot activation are product scope; the implementation now includes local workspace create/list/detail plus bundled-example metadata, but no import or snapshot writes.
 - Unknown evidence and unrun validation must not be presented as verified Qualified.
 - Data completeness, assessment status, and assurance status are separate dimensions.
 - No AI auto-approval, cloud multi-tenancy, remote synchronization, or automatic release approval in the MVP.
