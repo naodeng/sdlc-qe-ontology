@@ -172,20 +172,17 @@ def test_create_retries_collision_at_atomic_destination_claim(
             inject_existing_workspace()
         real_rename(source, destination)
 
-    real_os_mkdir = os.mkdir
+    real_rename_no_replace = module._rename_directory_no_replace
 
-    def mkdir_with_late_collision(path, mode=0o777, *, dir_fd=None):
-        if path == existing_id and not collision["injected"]:
+    def renameat_with_late_collision(parent_fd, source_name, destination_name):
+        if destination_name == existing_id and not collision["injected"]:
             inject_existing_workspace()
-        if dir_fd is None:
-            real_os_mkdir(path, mode)
-        else:
-            real_os_mkdir(path, mode, dir_fd=dir_fd)
+        real_rename_no_replace(parent_fd, source_name, destination_name)
 
     if os.name == "nt":
         monkeypatch.setattr(module.os, "rename", rename_with_late_collision)
     else:
-        monkeypatch.setattr(module.os, "mkdir", mkdir_with_late_collision)
+        monkeypatch.setattr(module, "_rename_directory_no_replace", renameat_with_late_collision)
 
     created = store.create("New workspace")
 
@@ -194,6 +191,45 @@ def test_create_retries_collision_at_atomic_destination_claim(
     assert existing_dir.stat().st_ino == collision["inode"]
     assert (existing_dir / "manifest.json").read_bytes() == collision["manifest"]
     assert store.get(existing_id).name == "Existing"
+
+
+def test_create_does_not_publish_into_replaced_destination_directory(
+    tmp_path: Path, monkeypatch
+) -> None:
+    if os.name == "nt":
+        pytest.skip("this race regression uses POSIX directory operations")
+    module = _load_store_module()
+    store = module.FilesystemWorkspaceStore(tmp_path / "data")
+    workspace_id = "6f35fb35-d617-44f2-926c-4029da7d7007"
+    final_dir = tmp_path / "data/workspaces" / workspace_id
+    moved_dir = final_dir.with_name("moved-workspace")
+    replaced = False
+    real_mkdir = os.mkdir
+    monkeypatch.setattr(module, "uuid4", lambda: UUID(workspace_id))
+
+    def mkdir_with_replacement(path, mode=0o777, *, dir_fd=None):
+        nonlocal replaced
+        if path == workspace_id and dir_fd is not None and not replaced:
+            real_mkdir(path, mode, dir_fd=dir_fd)
+            final_dir.rename(moved_dir)
+            real_mkdir(path, mode, dir_fd=dir_fd)
+            (final_dir / "preserve.txt").write_text("existing directory data", encoding="utf-8")
+            replaced = True
+        elif dir_fd is None:
+            real_mkdir(path, mode)
+        else:
+            real_mkdir(path, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(module.os, "mkdir", mkdir_with_replacement)
+
+    workspace = store.create("Project")
+
+    assert not replaced
+    assert workspace.workspace_id == workspace_id
+    assert not (final_dir / "preserve.txt").exists()
+    assert json.loads((final_dir / "manifest.json").read_text(encoding="utf-8"))[
+        "workspaceId"
+    ] == workspace_id
 
 
 def test_create_does_not_publish_through_replaced_destination_symlink(
@@ -209,34 +245,18 @@ def test_create_does_not_publish_through_replaced_destination_symlink(
     outside_dir.mkdir()
     outside_manifest = outside_dir / "manifest.json"
     outside_manifest.write_bytes(b"preserve existing file")
-    real_link = os.link
-    real_rename = os.rename
+    real_rename_no_replace = module._rename_directory_no_replace
     replaced = False
     monkeypatch.setattr(module, "uuid4", lambda: UUID(workspace_id))
 
-    def replace_claim_with_symlink() -> None:
+    def rename_with_swap(parent_fd, source_name, destination_name):
         nonlocal replaced
-        final_dir.rmdir()
-        final_dir.symlink_to(outside_dir, target_is_directory=True)
-        replaced = True
-
-    def link_with_swap(source, destination, *args, **kwargs):
-        if Path(destination) == Path("manifest.json") and kwargs.get("dst_dir_fd") is not None:
-            replace_claim_with_symlink()
-        return real_link(source, destination, *args, **kwargs)
-
-    def rename_with_swap(source, destination, *args, **kwargs):
-        nonlocal replaced
-        destination_path = Path(destination)
-        if destination_path == final_dir / "manifest.json":
-            replace_claim_with_symlink()
-        elif destination_path == final_dir and not final_dir.exists():
+        if destination_name == workspace_id and not replaced:
             final_dir.symlink_to(outside_dir, target_is_directory=True)
             replaced = True
-        return real_rename(source, destination, *args, **kwargs)
+        real_rename_no_replace(parent_fd, source_name, destination_name)
 
-    monkeypatch.setattr(module.os, "link", link_with_swap)
-    monkeypatch.setattr(module.os, "rename", rename_with_swap)
+    monkeypatch.setattr(module, "_rename_directory_no_replace", rename_with_swap)
 
     try:
         with pytest.raises(WorkspaceStorageUnavailable):
@@ -266,8 +286,10 @@ def test_create_failure_does_not_publish_partial_workspace(tmp_path: Path, monke
     def fail_publication(*args, **kwargs):
         raise OSError("manifest publication failed")
 
-    publication_function = "rename" if os.name == "nt" else "link"
-    monkeypatch.setattr(module.os, publication_function, fail_publication)
+    if os.name == "nt":
+        monkeypatch.setattr(module.os, "rename", fail_publication)
+    else:
+        monkeypatch.setattr(module, "_rename_directory_no_replace", fail_publication)
 
     with pytest.raises(WorkspaceStorageUnavailable):
         store.create("Project")

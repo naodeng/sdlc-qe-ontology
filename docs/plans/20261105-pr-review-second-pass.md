@@ -9,10 +9,10 @@ Fix staging cleanup and workspace-directory read races found after the first two
 
 ## Implementation
 
-- Remove the staging directory after successful publication, including the source manifest that remains after POSIX hard-link publication.
-- On POSIX systems with `O_DIRECTORY`, `O_NOFOLLOW`, and directory-descriptor operations, anchor the data root, `workspaces/`, UUID directories, manifest reads, publication, and cleanup to opened directory handles. Root or workspace path swaps fail closed without reading or writing through an outside symlink. If safe handles are unavailable, fail closed instead of using pathname-based reads or publication.
-- On Windows, creation atomically renames the complete staging directory to the UUID destination; reads check the workspace directory identity before and after reading. This Windows path was not runtime-verified in the macOS session and does not provide the same descriptor-based race guarantee as POSIX.
-- Leave the original approved implementation plan unchanged. Its initial UI E2E attempt ended before assertions, so it is not valid RED evidence. A separate replay of the new E2E case against an isolated `origin/main` archive now records the expected baseline failure; this is a review-time baseline replay, not a claim that the original implementation followed RED-first sequencing.
+- Publish the fully written staging directory with an atomic no-replace rename, so a UUID collision cannot replace an existing directory and successful creation leaves no staging directory.
+- On POSIX systems with `O_DIRECTORY`, `O_NOFOLLOW`, and directory-descriptor operations, anchor the data root, `workspaces/`, UUID directories, manifest reads, publication, and cleanup to opened directory handles. The no-replace rename uses Darwin `renameatx_np(RENAME_EXCL)` or Linux `renameat2(RENAME_NOREPLACE)`. Root or workspace path swaps fail closed without reading or writing through an outside symlink. If safe handles or filesystem no-replace rename are unavailable, fail closed.
+- On Windows, open the data and workspace roots as no-follow directory handles without delete sharing while path-based operations run; reject reparse roots and block root rename/replacement during each operation. Creation atomically renames the complete staging directory to the UUID destination; manifest reads also compare file and directory identities. This Windows path was not runtime-verified in the macOS session.
+- Correct the original plan's initial RED entries: missing implementation modules/routes prevented behavior assertions, so these are attempts rather than valid RED evidence. The initial UI E2E attempt also ended before assertions. A separate replay of the new E2E case against an isolated `origin/main` archive records the expected baseline failure; this is a review-time baseline replay, not a claim that the original implementation followed RED-first sequencing.
 - The current UI is light-only: no dark theme or `prefers-color-scheme` behavior exists. Dark-theme review is not applicable to this phase and is recorded as not implemented/not tested.
 
 ## Compatibility and boundaries
@@ -23,7 +23,7 @@ Fix staging cleanup and workspace-directory read races found after the first two
 
 ## TDD and verification
 
-- The pre-fix store tests failed: successful creation left `.staging-<uuid>`, a workspace-directory-to-symlink swap returned the outside manifest as a valid workspace, and replacing `workspaces/` during list/create could read or write through the outside symlink.
+- The pre-fix store tests failed: successful creation left `.staging-<uuid>`, a workspace-directory-to-symlink swap returned the outside manifest as a valid workspace, replacing `workspaces/` during list/create could read or write through the outside symlink, and an ordinary destination-directory replacement could receive a manifest after the directory was claimed.
 - After the fixes, those regression assertions pass. Repository and Playwright gates are recorded in [`pr-review-second-pass-20261105.md`](../qa/pr-review-second-pass-20261105.md).
 
 ## Rollback

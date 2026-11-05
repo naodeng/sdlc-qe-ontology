@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import datetime, timezone
+import ctypes
 import errno
 import json
 import os
@@ -11,6 +12,7 @@ from pathlib import Path
 import re
 import shutil
 import stat
+import sys
 from typing import Any
 from uuid import uuid4
 
@@ -42,7 +44,7 @@ _SUPPORTS_DIRECTORY_HANDLES = (
     and hasattr(os, "O_NOFOLLOW")
     and all(
         operation in os.supports_dir_fd
-        for operation in (os.open, os.link, os.stat, os.unlink, os.mkdir, os.rmdir)
+        for operation in (os.open, os.stat, os.unlink, os.mkdir, os.rmdir)
     )
     and os.listdir in os.supports_fd
 )
@@ -127,6 +129,20 @@ def _format_created_at(value: datetime) -> str:
     )
 
 
+def _new_workspace_manifest(
+    workspace_id: str,
+    name: str,
+    created_at: str,
+) -> dict[str, Any]:
+    return {
+        "schemaVersion": 1,
+        "workspaceId": workspace_id,
+        "name": name,
+        "createdAt": created_at,
+        "activeSnapshotId": None,
+    }
+
+
 def _parse_manifest(raw: bytes, expected_id: str) -> Workspace:
     try:
         decoded = raw.decode("utf-8")
@@ -201,6 +217,114 @@ def _remove_reservation(path: Path) -> None:
         pass
 
 
+def _rename_directory_no_replace(
+    parent_fd: int,
+    source_name: str,
+    destination_name: str,
+) -> None:
+    if sys.platform not in {"darwin", "linux"}:
+        raise OSError(errno.ENOTSUP, "atomic no-replace directory rename is unavailable")
+
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        rename = libc.renameatx_np if sys.platform == "darwin" else libc.renameat2
+    except AttributeError:
+        raise OSError(
+            errno.ENOTSUP,
+            "atomic no-replace directory rename is unavailable",
+        ) from None
+
+    rename.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    ]
+    rename.restype = ctypes.c_int
+    result = rename(
+        parent_fd,
+        os.fsencode(source_name),
+        parent_fd,
+        os.fsencode(destination_name),
+        0x00000004 if sys.platform == "darwin" else 0x00000001,
+    )
+
+    if result != 0:
+        error = ctypes.get_errno()
+        if error == errno.EEXIST:
+            raise FileExistsError(error, os.strerror(error), destination_name)
+        raise OSError(error, os.strerror(error), destination_name)
+
+
+def _open_windows_directory_lock(path: Path) -> int:
+    class _FileTime(ctypes.Structure):
+        _fields_ = [("low", ctypes.c_uint32), ("high", ctypes.c_uint32)]
+
+    class _FileInformation(ctypes.Structure):
+        _fields_ = [
+            ("attributes", ctypes.c_uint32),
+            ("creation_time", _FileTime),
+            ("access_time", _FileTime),
+            ("write_time", _FileTime),
+            ("volume_serial", ctypes.c_uint32),
+            ("file_size_high", ctypes.c_uint32),
+            ("file_size_low", ctypes.c_uint32),
+            ("number_of_links", ctypes.c_uint32),
+            ("file_index_high", ctypes.c_uint32),
+            ("file_index_low", ctypes.c_uint32),
+        ]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    create_file = kernel32.CreateFileW
+    create_file.argtypes = [
+        ctypes.c_wchar_p,
+        ctypes.c_uint32,
+        ctypes.c_uint32,
+        ctypes.c_void_p,
+        ctypes.c_uint32,
+        ctypes.c_uint32,
+        ctypes.c_void_p,
+    ]
+    create_file.restype = ctypes.c_void_p
+    handle = create_file(
+        str(path),
+        0x00000080,  # FILE_READ_ATTRIBUTES
+        0x00000003,  # FILE_SHARE_READ | FILE_SHARE_WRITE; deny delete/rename while open
+        None,
+        3,  # OPEN_EXISTING
+        0x02000000 | 0x00200000,  # FILE_FLAG_BACKUP_SEMANTICS | OPEN_REPARSE_POINT
+        None,
+    )
+    if handle == ctypes.c_void_p(-1).value:
+        raise ctypes.WinError(ctypes.get_last_error())
+
+    get_info = kernel32.GetFileInformationByHandle
+    get_info.argtypes = [ctypes.c_void_p, ctypes.POINTER(_FileInformation)]
+    get_info.restype = ctypes.c_int
+    information = _FileInformation()
+    if not get_info(handle, ctypes.byref(information)):
+        error = ctypes.WinError(ctypes.get_last_error())
+        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+        kernel32.CloseHandle.restype = ctypes.c_int
+        kernel32.CloseHandle(handle)
+        raise error
+    if not information.attributes & 0x10 or information.attributes & 0x400:
+        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+        kernel32.CloseHandle.restype = ctypes.c_int
+        kernel32.CloseHandle(handle)
+        raise OSError("storage root is not a plain directory")
+    return int(handle)
+
+
+def _close_windows_directory_lock(handle: int) -> None:
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+    kernel32.CloseHandle.restype = ctypes.c_int
+    if not kernel32.CloseHandle(ctypes.c_void_p(handle)):
+        raise ctypes.WinError(ctypes.get_last_error())
+
+
 class FilesystemWorkspaceStore:
     """A lazy local workspace store using one atomic manifest per workspace."""
 
@@ -257,8 +381,8 @@ class FilesystemWorkspaceStore:
                 reservation_stat = os.fstat(reservation_fd)
                 staging_name = f".staging-{workspace_id}"
                 staging_fd: int | None = None
-                final_fd: int | None = None
                 manifest_stat: os.stat_result | None = None
+                published = False
                 try:
                     try:
                         os.mkdir(staging_name, mode=0o700, dir_fd=workspaces_fd)
@@ -271,16 +395,18 @@ class FilesystemWorkspaceStore:
                         continue
                     staging_fd = self._open_child_directory(workspaces_fd, staging_name)
                     created_at = _format_created_at(datetime.now(timezone.utc))
-                    manifest = {
-                        "schemaVersion": 1,
-                        "workspaceId": workspace_id,
-                        "name": normalized_name,
-                        "createdAt": created_at,
-                        "activeSnapshotId": None,
-                    }
+                    manifest = _new_workspace_manifest(
+                        workspace_id,
+                        normalized_name,
+                        created_at,
+                    )
                     manifest_stat = self._write_manifest_at(staging_fd, manifest)
                     try:
-                        os.mkdir(workspace_id, mode=0o700, dir_fd=workspaces_fd)
+                        _rename_directory_no_replace(
+                            workspaces_fd,
+                            staging_name,
+                            workspace_id,
+                        )
                     except FileExistsError:
                         self._remove_manifest_if_owned(staging_fd, manifest_stat)
                         self._remove_child_directory_if_owned(
@@ -294,44 +420,34 @@ class FilesystemWorkspaceStore:
                             reservation_stat,
                         )
                         continue
-                    final_fd = self._open_child_directory(workspaces_fd, workspace_id)
-                    self._publish_manifest_at(
-                        staging_fd,
-                        final_fd,
-                        expected_manifest=manifest_stat,
-                    )
+                    published = True
                     if not self._directory_entry_matches(
                         workspaces_fd,
                         workspace_id,
-                        final_fd,
+                        staging_fd,
                     ):
                         raise OSError("workspace directory changed during create")
                     if not self._storage_handles_match(data_fd, workspaces_fd):
                         raise OSError("workspace storage root changed during create")
-                    self._remove_manifest_if_owned(staging_fd, manifest_stat)
-                    self._remove_child_directory_if_owned(
-                        workspaces_fd,
-                        staging_name,
-                        staging_fd,
-                    )
                     self._unlink_if_owned(
                         workspaces_fd,
                         reservation_name,
                         reservation_stat,
                     )
+                    os.fsync(workspaces_fd)
+                    if not self._storage_handles_match(data_fd, workspaces_fd):
+                        raise OSError("workspace storage root changed during create")
                     return Workspace(workspace_id, normalized_name, created_at)
                 except OSError:
-                    if final_fd is not None and manifest_stat is not None:
-                        self._remove_manifest_if_owned(final_fd, manifest_stat)
-                    if final_fd is not None:
+                    if staging_fd is not None and manifest_stat is not None:
+                        self._remove_manifest_if_owned(staging_fd, manifest_stat)
+                    if staging_fd is not None and published:
                         self._remove_child_directory_if_owned(
                             workspaces_fd,
                             workspace_id,
-                            final_fd,
+                            staging_fd,
                         )
-                    if staging_fd is not None:
-                        if manifest_stat is not None:
-                            self._remove_manifest_if_owned(staging_fd, manifest_stat)
+                    elif staging_fd is not None:
                         self._remove_child_directory_if_owned(
                             workspaces_fd,
                             staging_name,
@@ -344,7 +460,7 @@ class FilesystemWorkspaceStore:
                     )
                     raise WorkspaceStorageUnavailable from None
                 finally:
-                    for descriptor in (staging_fd, final_fd, reservation_fd):
+                    for descriptor in (staging_fd, reservation_fd):
                         if descriptor is not None:
                             os.close(descriptor)
 
@@ -361,6 +477,20 @@ class FilesystemWorkspaceStore:
         try:
             _ensure_directory(self._data_root)
             self._ensure_workspaces_root(create=True)
+            root_locks = self._open_windows_root_locks()
+            if root_locks is None:
+                raise WorkspaceStorageUnavailable
+            try:
+                return self._create_windows_locked(normalized_name)
+            finally:
+                self._close_windows_root_locks(root_locks)
+        except WorkspaceStorageUnavailable:
+            raise
+        except OSError:
+            raise WorkspaceStorageUnavailable from None
+
+    def _create_windows_locked(self, normalized_name: str) -> Workspace:
+        try:
 
             for _ in range(10):
                 workspace_id = str(uuid4())
@@ -395,13 +525,11 @@ class FilesystemWorkspaceStore:
 
                 try:
                     created_at = _format_created_at(datetime.now(timezone.utc))
-                    manifest = {
-                        "schemaVersion": 1,
-                        "workspaceId": workspace_id,
-                        "name": normalized_name,
-                        "createdAt": created_at,
-                        "activeSnapshotId": None,
-                    }
+                    manifest = _new_workspace_manifest(
+                        workspace_id,
+                        normalized_name,
+                        created_at,
+                    )
                     self._write_manifest(temp_dir / MANIFEST_FILE, manifest)
                     try:
                         os.rename(temp_dir, final_dir)
@@ -426,7 +554,13 @@ class FilesystemWorkspaceStore:
         if os.name != "nt":
             return self._list_posix()
 
-        return self._list_windows()
+        root_locks = self._open_windows_root_locks()
+        if root_locks is None:
+            return []
+        try:
+            return self._list_windows()
+        finally:
+            self._close_windows_root_locks(root_locks)
 
     def _list_posix(self) -> list[WorkspaceSummary]:
         if not _SUPPORTS_DIRECTORY_HANDLES:
@@ -570,7 +704,13 @@ class FilesystemWorkspaceStore:
         if os.name != "nt":
             return self._get_posix(canonical_id)
 
-        return self._get_windows(canonical_id)
+        root_locks = self._open_windows_root_locks()
+        if root_locks is None:
+            raise WorkspaceNotFound
+        try:
+            return self._get_windows(canonical_id)
+        finally:
+            self._close_windows_root_locks(root_locks)
 
     def _get_posix(self, workspace_id: str) -> Workspace:
         if not _SUPPORTS_DIRECTORY_HANDLES:
@@ -651,6 +791,25 @@ class FilesystemWorkspaceStore:
             raise WorkspaceNotFound
         if not stat.S_ISDIR(metadata.st_mode):
             raise WorkspaceStorageUnavailable
+
+    def _open_windows_root_locks(self) -> list[int] | None:
+        handles: list[int] = []
+        try:
+            if not _path_exists(self._data_root) or not _path_exists(
+                self._workspaces_root
+            ):
+                return None
+            handles.append(_open_windows_directory_lock(self._data_root))
+            handles.append(_open_windows_directory_lock(self._workspaces_root))
+            return handles
+        except (OSError, AttributeError):
+            self._close_windows_root_locks(handles)
+            raise WorkspaceStorageUnavailable from None
+
+    @staticmethod
+    def _close_windows_root_locks(handles: list[int]) -> None:
+        for handle in reversed(handles):
+            _close_windows_directory_lock(handle)
 
     def _open_data_root(self, *, create: bool) -> int | None:
         if create:
@@ -754,54 +913,6 @@ class FilesystemWorkspaceStore:
             stream.flush()
             os.fsync(stream.fileno())
             return os.fstat(stream.fileno())
-
-    @staticmethod
-    def _publish_manifest_at(
-        source_directory_fd: int,
-        destination_directory_fd: int,
-        *,
-        expected_manifest: os.stat_result,
-    ) -> None:
-        source = os.stat(
-            MANIFEST_FILE,
-            dir_fd=source_directory_fd,
-            follow_symlinks=False,
-        )
-        if (
-            not stat.S_ISREG(source.st_mode)
-            or source.st_dev != expected_manifest.st_dev
-            or source.st_ino != expected_manifest.st_ino
-        ):
-            raise OSError("staged manifest changed during create")
-        os.link(
-            MANIFEST_FILE,
-            MANIFEST_FILE,
-            src_dir_fd=source_directory_fd,
-            dst_dir_fd=destination_directory_fd,
-            follow_symlinks=False,
-        )
-        published = os.stat(
-            MANIFEST_FILE,
-            dir_fd=destination_directory_fd,
-            follow_symlinks=False,
-        )
-        if (
-            not stat.S_ISREG(published.st_mode)
-            or published.st_dev != expected_manifest.st_dev
-            or published.st_ino != expected_manifest.st_ino
-        ):
-            raise OSError("published manifest changed during create")
-        os.fsync(destination_directory_fd)
-        published_after_sync = os.stat(
-            MANIFEST_FILE,
-            dir_fd=destination_directory_fd,
-            follow_symlinks=False,
-        )
-        if (
-            published_after_sync.st_dev != expected_manifest.st_dev
-            or published_after_sync.st_ino != expected_manifest.st_ino
-        ):
-            raise OSError("published manifest changed during create")
 
     @staticmethod
     def _unlink_if_owned(

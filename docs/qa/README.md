@@ -6,8 +6,8 @@ Current verification report: [`pr-review-second-pass-20261105.md`](pr-review-sec
 
 Current workspace gates:
 
-- `./scripts/verify.sh` passed on 2026-11-05: Ruff, 76 pytest tests and 58 subtests, SPARQL CQs, SHACL positive/negative fixtures, mapping profile schema, TypeScript, and Vite build.
-- Playwright browser E2E: `npm --workspace frontend run e2e` passed all 3 tests using isolated temporary storage and an available loopback port.
+- `./scripts/verify.sh` passed on 2026-11-05 after the latest second-pass review fixes: Ruff, 80 pytest tests and 58 subtests, SPARQL CQs, SHACL positive/negative fixtures, mapping profile schema, TypeScript, and Vite build. See the current verification report for the exact run.
+- Playwright browser E2E: `env -u SDLC_QE_DATA_DIR -u SDLC_QE_E2E_DATA_ROOT -u E2E_FRONTEND_PORT npm --workspace frontend run e2e` passed all 3 tests in 10.0 seconds using isolated temporary storage and an available loopback port; the temporary root was removed.
 - Direct Playwright CLI invocation without the isolation marker is rejected before servers start.
 
 Historical bootstrap run record: [`bootstrap-verification-20261104.md`](bootstrap-verification-20261104.md). Historical results do not establish the current checkout's status.
