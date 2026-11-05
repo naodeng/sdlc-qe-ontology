@@ -122,6 +122,10 @@ def test_create_writes_v1_manifest_and_returns_workspace(tmp_path: Path) -> None
     assert workspace.status is WorkspaceStatus.EMPTY
     assert workspace.active_snapshot_id is None
     assert store.get(workspace.workspace_id) == workspace
+    assert not any(
+        entry.name.startswith(".staging-")
+        for entry in (tmp_path / "data/workspaces").iterdir()
+    )
 
 
 def test_create_retries_uuid_collision_without_overwriting(tmp_path: Path, monkeypatch) -> None:
@@ -161,13 +165,6 @@ def test_create_retries_collision_at_atomic_destination_claim(
         )
         collision["inode"] = existing_dir.stat().st_ino
 
-    real_mkdir = Path.mkdir
-
-    def mkdir_with_late_collision(path: Path, *args, **kwargs) -> None:
-        if path == existing_dir and not collision["injected"]:
-            inject_existing_workspace()
-        real_mkdir(path, *args, **kwargs)
-
     real_rename = os.rename
 
     def rename_with_late_collision(source: Path, destination: Path) -> None:
@@ -175,8 +172,20 @@ def test_create_retries_collision_at_atomic_destination_claim(
             inject_existing_workspace()
         real_rename(source, destination)
 
-    monkeypatch.setattr(module.Path, "mkdir", mkdir_with_late_collision)
-    monkeypatch.setattr(module.os, "rename", rename_with_late_collision)
+    real_os_mkdir = os.mkdir
+
+    def mkdir_with_late_collision(path, mode=0o777, *, dir_fd=None):
+        if path == existing_id and not collision["injected"]:
+            inject_existing_workspace()
+        if dir_fd is None:
+            real_os_mkdir(path, mode)
+        else:
+            real_os_mkdir(path, mode, dir_fd=dir_fd)
+
+    if os.name == "nt":
+        monkeypatch.setattr(module.os, "rename", rename_with_late_collision)
+    else:
+        monkeypatch.setattr(module.os, "mkdir", mkdir_with_late_collision)
 
     created = store.create("New workspace")
 
@@ -444,6 +453,127 @@ def test_store_rejects_symlink_workspace_directory(tmp_path: Path) -> None:
         store.get(workspace_id)
 
 
+def test_list_does_not_follow_workspace_directory_replaced_with_symlink(
+    tmp_path: Path, monkeypatch
+) -> None:
+    if os.name == "nt":
+        pytest.skip("symlink creation may require elevated privileges on Windows")
+    module = _load_store_module()
+    store = module.FilesystemWorkspaceStore(tmp_path / "data")
+    workspace = store.create("Project")
+    workspace_dir = tmp_path / "data/workspaces" / workspace.workspace_id
+    moved_directory = workspace_dir.with_name("moved-workspace")
+    outside_dir = tmp_path / "outside"
+    _write_manifest(outside_dir, _manifest(workspace.workspace_id, name="Outside secret"))
+    real_open = os.open
+    replaced = False
+
+    def open_after_directory_swap(path, flags, *args, **kwargs):
+        nonlocal replaced
+        if Path(path).name == "manifest.json" and not replaced:
+            workspace_dir.rename(moved_directory)
+            workspace_dir.symlink_to(outside_dir, target_is_directory=True)
+            replaced = True
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(module.os, "open", open_after_directory_swap)
+
+    try:
+        summary = next(
+            item for item in store.list() if item.workspace_id == workspace.workspace_id
+        )
+        assert replaced
+        assert summary.status is WorkspaceStatus.CORRUPT
+        assert summary.name is None
+    finally:
+        if workspace_dir.is_symlink():
+            workspace_dir.unlink()
+
+
+def test_list_rejects_workspaces_root_replaced_with_symlink(
+    tmp_path: Path, monkeypatch
+) -> None:
+    if os.name == "nt":
+        pytest.skip("symlink creation may require elevated privileges on Windows")
+    module = _load_store_module()
+    data_root = tmp_path / "data"
+    workspaces_root = data_root / "workspaces"
+    outside_root = tmp_path / "outside"
+    workspace_id = "6f35fb35-d617-44f2-926c-4029da7d7007"
+    _write_manifest(outside_root / workspace_id, _manifest(workspace_id, name="Outside secret"))
+    workspaces_root.mkdir(parents=True)
+    moved_root = workspaces_root.with_name("moved-workspaces")
+    replaced = False
+
+    def replace_root() -> None:
+        nonlocal replaced
+        if not replaced:
+            workspaces_root.rename(moved_root)
+            workspaces_root.symlink_to(outside_root, target_is_directory=True)
+            replaced = True
+
+    real_scandir = os.scandir
+    real_listdir = os.listdir
+
+    def scandir_with_root_swap(path):
+        if Path(path) == workspaces_root:
+            replace_root()
+        return real_scandir(path)
+
+    def listdir_with_root_swap(path):
+        if isinstance(path, int):
+            replace_root()
+        return real_listdir(path)
+
+    monkeypatch.setattr(module.os, "scandir", scandir_with_root_swap)
+    monkeypatch.setattr(module.os, "listdir", listdir_with_root_swap)
+
+    try:
+        with pytest.raises(WorkspaceStorageUnavailable):
+            module.FilesystemWorkspaceStore(data_root).list()
+        assert replaced
+    finally:
+        if workspaces_root.is_symlink():
+            workspaces_root.unlink()
+
+
+def test_create_does_not_write_through_replaced_workspaces_root_symlink(
+    tmp_path: Path, monkeypatch
+) -> None:
+    if os.name == "nt":
+        pytest.skip("symlink creation may require elevated privileges on Windows")
+    module = _load_store_module()
+    data_root = tmp_path / "data"
+    workspaces_root = data_root / "workspaces"
+    workspaces_root.mkdir(parents=True)
+    outside_root = tmp_path / "outside"
+    outside_root.mkdir()
+    moved_root = workspaces_root.with_name("moved-workspaces")
+    replaced = False
+    real_open = os.open
+    workspace_id = "6f35fb35-d617-44f2-926c-4029da7d7007"
+    monkeypatch.setattr(module, "uuid4", lambda: UUID(workspace_id))
+
+    def open_with_root_swap(path, flags, *args, **kwargs):
+        nonlocal replaced
+        if Path(path).name == f".creating-{workspace_id}" and not replaced:
+            workspaces_root.rename(moved_root)
+            workspaces_root.symlink_to(outside_root, target_is_directory=True)
+            replaced = True
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(module.os, "open", open_with_root_swap)
+
+    try:
+        with pytest.raises(WorkspaceStorageUnavailable):
+            module.FilesystemWorkspaceStore(data_root).create("Project")
+        assert replaced
+        assert list(outside_root.iterdir()) == []
+    finally:
+        if workspaces_root.is_symlink():
+            workspaces_root.unlink()
+
+
 def test_store_rejects_symlink_manifest(tmp_path: Path) -> None:
     if os.name == "nt":
         pytest.skip("symlink creation may require elevated privileges on Windows")
@@ -472,9 +602,18 @@ def test_list_reports_no_follow_eloop_as_corrupt_and_continues(
     manifest_path = tmp_path / "data/workspaces" / workspace_id / "manifest.json"
     _write_manifest(manifest_path.parent, _manifest(workspace_id))
     real_open = os.open
+    real_fstat = os.fstat
+    target_directory = manifest_path.parent.stat()
 
     def open_with_no_follow_race(path, flags, *args, **kwargs):
-        if Path(path) == manifest_path and flags & getattr(os, "O_NOFOLLOW", 0):
+        is_target_manifest = Path(path) == manifest_path
+        if path == "manifest.json" and kwargs.get("dir_fd") is not None:
+            directory = real_fstat(kwargs["dir_fd"])
+            is_target_manifest = (
+                directory.st_dev == target_directory.st_dev
+                and directory.st_ino == target_directory.st_ino
+            )
+        if is_target_manifest and flags & getattr(os, "O_NOFOLLOW", 0):
             raise OSError(errno.ELOOP, "too many levels of symbolic links")
         return real_open(path, flags, *args, **kwargs)
 

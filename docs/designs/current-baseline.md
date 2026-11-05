@@ -1,6 +1,6 @@
 # Current product and implementation baseline
 
-**State:** Bootstrap and local workspace management slice implemented. Playwright E2E passed on 2026-11-05 through the npm workspace command with isolated temporary storage and an ephemeral loopback port. Workspace manifest publication is bound to a no-follow directory handle where supported. MVP remains Candidate / No-Go until Sprint 0 evidence and import/assessment workflows are implemented.
+**State:** Bootstrap and local workspace management slice implemented. Playwright E2E passed on 2026-11-05 through the npm workspace command with isolated temporary storage and an ephemeral loopback port. POSIX workspace manifest publication and reads use no-follow directory handles where supported. MVP remains Candidate / No-Go until Sprint 0 evidence and import/assessment workflows are implemented.
 
 ## Accepted product decisions
 
@@ -19,6 +19,7 @@
 - Chinese-first Arco workbench with an English switch and Overview, Ontology, Import, Analysis, and Workspaces routes.
 - Manifest-backed local workspace storage with private POSIX permissions, atomic creation, strict schema validation, and corrupt-entry reporting.
 - E2E package scripts use a temporary local data root and reject direct Playwright launches without the isolation marker.
+- Successful workspace creation removes staging files; symlinked directory races are reported as unavailable rather than returning outside manifest data.
 - Workspaces stay separate from the bundled, read-only example; JSON is identified in the UI as the selected first importer.
 - Existing ontology, SHACL, SPARQL, and mapping-schema candidate assets with strict checks.
 
