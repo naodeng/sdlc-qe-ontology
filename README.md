@@ -2,7 +2,7 @@
 
 Local-first workbench for tracing software delivery and quality evidence.
 
-本仓库已搭好可运行的项目基础。工作台默认使用简体中文，可切换 English。当前 UI/API 只读取候选本体和随仓库提供的示例数据；真实数据导入、映射审批、快照发布和质量评估流程尚未实现。示例数据不代表验证结果。
+工作台默认使用简体中文，可切换 English。现在可创建、列出并只读查看本地工作区；仓库示例始终作为独立只读数据源。受限 JSON 是选定的首个导入格式，但导入、映射审批、快照发布和质量评估流程尚未实现。示例数据不代表验证结果。
 
 ## Quick start
 
@@ -18,6 +18,8 @@ Run checks with make verify. First install Playwright Chromium with cd frontend 
 - [简体中文使用说明](README.zh-CN.md)
 - [English setup guide](README.en.md)
 - [Product and implementation baseline](docs/designs/current-baseline.md)
+- [Local workspace requirement and implementation plan](docs/features/REQ-WORKSPACE-001-local-workspaces.md)
+- [Latest workspace verification evidence](docs/qa/pr-review-second-pass-20261105.md)
 - [Repository bootstrap plan](docs/plans/20261104-repository-bootstrap.md)
 - [Repository engineering standards](docs/standards/README.md)
 - [Current API contract](docs/designs/api.yaml)

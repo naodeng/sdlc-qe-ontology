@@ -1,14 +1,15 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Button, Layout, Menu, Tag, Typography } from '@arco-design/web-react';
-import { BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getWorkbenchMeta } from './api/client';
 import type { WorkbenchMeta } from './api/types';
 import { messages, type Locale, type Messages } from './i18n';
+import { WorkspaceDetailPage, WorkspacesPage } from './pages/WorkspacesPage';
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
 
-function NavMark({ kind }: { kind: 'overview' | 'ontology' | 'import' | 'analysis' }) {
+function NavMark({ kind }: { kind: 'overview' | 'ontology' | 'import' | 'analysis' | 'workspaces' }) {
   const common = {
     width: 19,
     height: 19,
@@ -30,6 +31,9 @@ function NavMark({ kind }: { kind: 'overview' | 'ontology' | 'import' | 'analysi
   if (kind === 'import') {
     return <svg {...common}><path d="M10 13V3.5m0 0L6.5 7M10 3.5 13.5 7M4 12.5v3.8h12v-3.8" /></svg>;
   }
+  if (kind === 'workspaces') {
+    return <svg {...common}><rect x="3" y="3" width="14" height="14" rx="2" /><path d="M7 7h6M7 10h6M7 13h3" /></svg>;
+  }
   return <svg {...common}><path d="M3 16.5h14M5 13.5V9m5 4.5V5m5 8.5V7" /><circle cx="5" cy="7" r="1" /><circle cx="10" cy="3" r="1" /><circle cx="15" cy="5" r="1" /></svg>;
 }
 
@@ -49,7 +53,7 @@ function AppFrame() {
   const [meta, setMeta] = useState<WorkbenchMeta | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const copy = messages[locale];
-  const activeKey = location.pathname === '/' ? '/' : location.pathname;
+  const activeKey = location.pathname.startsWith('/workspaces') ? '/workspaces' : location.pathname === '/' ? '/' : location.pathname;
 
   useEffect(() => {
     document.documentElement.lang = locale === 'zh' ? 'zh-CN' : 'en';
@@ -95,6 +99,7 @@ function AppFrame() {
           <Menu.Item key="/ontology"><NavMark kind="ontology" /><span>{copy.navOntology}</span></Menu.Item>
           <Menu.Item key="/import"><NavMark kind="import" /><span>{copy.navImport}</span></Menu.Item>
           <Menu.Item key="/analysis"><NavMark kind="analysis" /><span>{copy.navAnalysis}</span></Menu.Item>
+          <Menu.Item key="/workspaces"><NavMark kind="workspaces" /><span>{copy.navWorkspaces}</span></Menu.Item>
         </Menu>
 
         <div className="sidebar-note"><Text>{copy.sidebarNote}</Text></div>
@@ -117,6 +122,7 @@ function AppFrame() {
             <MobileNavLink to="/ontology" label={copy.navOntology} />
             <MobileNavLink to="/import" label={copy.navImport} />
             <MobileNavLink to="/analysis" label={copy.navAnalysis} />
+            <MobileNavLink to="/workspaces" label={copy.navWorkspaces} />
           </nav>
         </Header>
 
@@ -140,6 +146,8 @@ function AppFrame() {
               <Route path="/ontology" element={<OntologyPage meta={meta} copy={copy} />} />
               <Route path="/import" element={<ImportPage copy={copy} />} />
               <Route path="/analysis" element={<AnalysisPage meta={meta} copy={copy} />} />
+              <Route path="/workspaces" element={<WorkspacesPage copy={copy} />} />
+              <Route path="/workspaces/:workspaceId" element={<WorkspaceDetailRoute copy={copy} />} />
               <Route path="*" element={<OverviewPage meta={meta} copy={copy} onNavigate={navigate} />} />
             </Routes>
           )}
@@ -148,6 +156,11 @@ function AppFrame() {
     </Layout>
     </>
   );
+}
+
+function WorkspaceDetailRoute({ copy }: { copy: Messages }) {
+  const { workspaceId } = useParams();
+  return workspaceId ? <WorkspaceDetailPage workspaceId={workspaceId} copy={copy} /> : <WorkspacesPage copy={copy} />;
 }
 
 function MobileNavLink({ to, label }: { to: string; label: string }) {
@@ -369,6 +382,7 @@ function pageTitle(path: string, copy: Messages) {
     '/import': copy.navImport,
     '/analysis': copy.navAnalysis,
   };
+  if (path.startsWith('/workspaces')) return copy.navWorkspaces;
   return pages[path] ?? copy.navOverview;
 }
 

@@ -12,4 +12,18 @@ if [[ ! -x "$ROOT/node_modules/.bin/playwright" ]]; then
   exit 2
 fi
 
-npm --workspace frontend run e2e
+E2E_DATA_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/sdlc-qe-e2e.XXXXXX")"
+cleanup() {
+  rm -rf -- "$E2E_DATA_ROOT"
+}
+trap cleanup EXIT
+export SDLC_QE_DATA_DIR="$E2E_DATA_ROOT"
+export SDLC_QE_E2E_DATA_ROOT="$E2E_DATA_ROOT"
+
+if [[ -z "${E2E_FRONTEND_PORT:-}" ]]; then
+  E2E_FRONTEND_PORT="$("$ROOT/.venv/bin/python" -c 'import socket; sock = socket.socket(); sock.bind(("127.0.0.1", 0)); print(sock.getsockname()[1]); sock.close()')"
+fi
+export E2E_FRONTEND_PORT
+
+cd "$ROOT/frontend"
+"$ROOT/node_modules/.bin/playwright" test --config "$ROOT/frontend/playwright.config.ts" "$@"

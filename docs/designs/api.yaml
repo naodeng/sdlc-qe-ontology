@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: SDLC-QE Ontology Workbench Local Read-only API
+  title: SDLC-QE Ontology Workbench Local API
   version: 0.1.0-bootstrap
   description: Implemented local bootstrap contract. Product import and assessment APIs are not implemented.
 servers:
@@ -12,6 +12,8 @@ paths:
       responses:
         '200':
           description: API process health
+        '403':
+          $ref: '#/components/responses/OriginRejected'
   /api/v1/meta:
     get:
       operationId: getMeta
@@ -22,8 +24,204 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkbenchMeta'
+        '403':
+          $ref: '#/components/responses/OriginRejected'
+  /api/v1/workspaces:
+    get:
+      operationId: listWorkspaces
+      responses:
+        '200':
+          description: User workspaces, including unavailable corrupt manifests without exposing their contents.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceList'
+        '503':
+          $ref: '#/components/responses/WorkspaceStorageUnavailable'
+        '403':
+          $ref: '#/components/responses/OriginRejected'
+    post:
+      operationId: createWorkspace
+      parameters:
+        - name: Origin
+          in: header
+          required: true
+          description: Must match an allowed local workbench origin.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceCreate'
+      responses:
+        '201':
+          description: Created empty workspace. No data, snapshot, or assessment is created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workspace'
+        '403':
+          $ref: '#/components/responses/OriginRejected'
+        '422':
+          description: Invalid workspace name or request shape.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/WorkspaceError'
+                  - $ref: '#/components/schemas/RequestValidationError'
+        '503':
+          $ref: '#/components/responses/WorkspaceStorageUnavailable'
+  /api/v1/workspaces/{workspaceId}:
+    get:
+      operationId: getWorkspace
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Empty workspace metadata; data access and mutation are not part of this API phase.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workspace'
+        '404':
+          $ref: '#/components/responses/WorkspaceNotFound'
+        '409':
+          $ref: '#/components/responses/WorkspaceManifestUnavailable'
+        '503':
+          $ref: '#/components/responses/WorkspaceStorageUnavailable'
+        '403':
+          $ref: '#/components/responses/OriginRejected'
 components:
+  responses:
+    OriginRejected:
+      description: The Origin header is required when specified by the operation and must match the local allowlist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/WorkspaceError'
+    WorkspaceNotFound:
+      description: Workspace identifier is invalid or no workspace exists for it.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/WorkspaceError'
+    WorkspaceManifestUnavailable:
+      description: Workspace manifest is corrupt, unsupported, or unsafe to read.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/WorkspaceError'
+    WorkspaceStorageUnavailable:
+      description: Local workspace storage cannot be accessed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/WorkspaceError'
   schemas:
+    WorkspaceCreate:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: The server trims surrounding whitespace, then requires 1–80 Unicode code points; control characters and lone surrogate code points are rejected.
+    Workspace:
+      type: object
+      additionalProperties: false
+      required: [workspaceId, name, createdAt, status, activeSnapshotId]
+      properties:
+        workspaceId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          const: empty
+        activeSnapshotId:
+          type: 'null'
+    CorruptWorkspace:
+      type: object
+      additionalProperties: false
+      required: [workspaceId, name, createdAt, status, issueCode]
+      properties:
+        workspaceId:
+          type: string
+          format: uuid
+        name:
+          type: 'null'
+        createdAt:
+          type: 'null'
+        status:
+          type: string
+          const: corrupt
+        issueCode:
+          type: string
+          const: workspace_manifest_unavailable
+    WorkspaceList:
+      type: object
+      additionalProperties: false
+      required: [workspaces]
+      properties:
+        workspaces:
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/Workspace'
+              - $ref: '#/components/schemas/CorruptWorkspace'
+    WorkspaceError:
+      type: object
+      additionalProperties: false
+      required: [detail]
+      properties:
+        detail:
+          type: object
+          additionalProperties: false
+          required: [code]
+          properties:
+            code:
+              type: string
+              enum:
+                - origin_required
+                - origin_not_allowed
+                - workspace_name_invalid
+                - workspace_not_found
+                - workspace_manifest_unavailable
+                - workspace_storage_unavailable
+    RequestValidationError:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            required: [loc, msg, type]
+            properties:
+              loc:
+                type: array
+                items:
+                  oneOf:
+                    - type: string
+                    - type: integer
+              msg:
+                type: string
+              type:
+                type: string
+            additionalProperties: true
     WorkbenchMeta:
       type: object
       required:

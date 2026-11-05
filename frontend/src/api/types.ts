@@ -9,3 +9,23 @@ export interface WorkbenchMeta {
   propertyCount: number;
   dataSource: 'bundled-example-fixture';
 }
+
+export interface Workspace {
+  workspaceId: string;
+  name: string;
+  createdAt: string;
+  status: 'empty';
+  activeSnapshotId: null;
+}
+
+export interface EmptyWorkspaceSummary extends Workspace {}
+
+export interface CorruptWorkspaceSummary {
+  workspaceId: string;
+  name: null;
+  createdAt: null;
+  status: 'corrupt';
+  issueCode: 'workspace_manifest_unavailable';
+}
+
+export type WorkspaceSummary = EmptyWorkspaceSummary | CorruptWorkspaceSummary;

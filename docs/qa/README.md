@@ -2,13 +2,17 @@
 
 Trace each requirement to a test case, reproducible command, current run report, and gate state. `not_run` and `blocked` are not `passed`.
 
-Current bootstrap gates:
+Current verification report: [`pr-review-second-pass-20261105.md`](pr-review-second-pass-20261105.md).
 
-- Python/API, SPARQL CQ, and SHACL positive/negative fixtures: `scripts/verify_baseline.py`.
-- Mapping profile schema positive/negative checks: `scripts/validate_mapping_schema.py`.
-- Python lint and frontend build: `scripts/verify.sh`.
-- Browser smoke test: `scripts/e2e-run.sh`.
+Current workspace gates:
 
-Latest run record: [`bootstrap-verification-20261104.md`](bootstrap-verification-20261104.md). The corrected Playwright runner has not yet had a successful E2E run; do not treat the manual Ego preview as an E2E pass.
+- `./scripts/verify.sh` passed at commit `64784e4` on 2026-11-05: Ruff, 87 pytest tests and 58 subtests, SPARQL CQs, SHACL positive/negative fixtures, mapping profile schema, TypeScript, and Vite build. See the current verification report for the exact run.
+- Playwright browser E2E: `env -u SDLC_QE_DATA_DIR -u SDLC_QE_E2E_DATA_ROOT -u E2E_FRONTEND_PORT npm --workspace frontend run e2e` passed all 3 tests in 9.6 seconds using isolated temporary storage; the temporary root was removed.
+- Native Windows storage tests passed in GitHub Actions at `64784e4` (43 passed, 12 platform-specific skips); see the current verification report.
+- Direct Playwright CLI invocation without the isolation marker is rejected before servers start.
+
+Historical bootstrap run record: [`bootstrap-verification-20261104.md`](bootstrap-verification-20261104.md). Historical results do not establish the current checkout's status.
+Earlier workspace and storage hardening evidence: [`workspaces-verification-20261105.md`](workspaces-verification-20261105.md) and [`workspace-storage-race-hardening-20261105.md`](workspace-storage-race-hardening-20261105.md).
+First PR review-fix report: [`pr-review-fixes-20261105.md`](pr-review-fixes-20261105.md).
 
 Test code lives in `tests/` and `e2e/tests/`. This directory holds case descriptions and evidence indexes; current-run results must be recorded separately from the historical logs in `evidence/`.

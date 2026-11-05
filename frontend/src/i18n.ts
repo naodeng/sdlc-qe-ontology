@@ -8,6 +8,7 @@ type MessageSet = {
   navOntology: string;
   navImport: string;
   navAnalysis: string;
+  navWorkspaces: string;
   brandCaption: string;
   workspaceLabel: string;
   workspaceName: string;
@@ -76,6 +77,40 @@ type MessageSet = {
   apiUnavailableTitle: string;
   apiUnavailableDescription: string;
   startCommand: string;
+  workspacesTitle: string;
+  workspacesDescription: string;
+  createWorkspaceTitle: string;
+  workspaceNameFieldLabel: string;
+  workspaceNamePlaceholder: string;
+  workspaceNameHint: string;
+  createWorkspaceAction: string;
+  workspaceListTitle: string;
+  workspaceLoading: string;
+  workspaceCount: (count: number) => string;
+  noWorkspacesTitle: string;
+  noWorkspacesDescription: string;
+  emptyWorkspaceStatus: string;
+  dateUnavailable: string;
+  corruptWorkspaceName: string;
+  corruptWorkspaceDescription: string;
+  backToWorkspaces: string;
+  workspaceUnavailableLabel: string;
+  workspaceUnavailableDescription: string;
+  workspaceDetailKicker: string;
+  workspaceDetailDescription: string;
+  workspaceStateTitle: string;
+  workspaceDataStatus: string;
+  noImportedData: string;
+  activeSnapshotLabel: string;
+  noActiveSnapshot: string;
+  workspaceAccessLabel: string;
+  workspaceReadonly: string;
+  workspaceCreatedLabel: string;
+  workspaceGenericError: string;
+  workspaceNameInvalidError: string;
+  workspaceNotFoundError: string;
+  workspaceManifestError: string;
+  workspaceStorageError: string;
 };
 
 export type Messages = MessageSet;
@@ -89,13 +124,14 @@ export const messages: Record<Locale, MessageSet> = {
     navOntology: '本体模型',
     navImport: '数据导入',
     navAnalysis: '质量分析',
+    navWorkspaces: '工作区',
     brandCaption: '质量证据工作台',
-    workspaceLabel: '当前工作区',
-    workspaceName: '示例项目',
-    workspaceMeta: '本地示例 · 只读',
-    sidebarNote: '仅展示仓库自带的演示数据，不连接外部项目。',
-    localMode: '本地工作区',
-    bundledLabel: '示例数据',
+    workspaceLabel: '全局数据源',
+    workspaceName: '仓库示例 · 只读',
+    workspaceMeta: '工作区详情不会更改此数据源',
+    sidebarNote: '工作区用于管理本地项目。此处始终展示与工作区分开的仓库示例。',
+    localMode: '本地模式',
+    bundledLabel: '仓库示例 · 只读',
     overviewKicker: '项目概览 / 质量追溯',
     overviewTitle: '质量证据总览',
     overviewDescription: '沿着需求、测试与证据的关系，快速看清当前数据能说明什么。',
@@ -151,7 +187,7 @@ export const messages: Record<Locale, MessageSet> = {
     mappingTitle: '字段含义由你确认',
     mappingDescription: '导入后先预览字段，再检查映射。只有人工明确确认后，映射才可进入数据校验。',
     importSteps: [
-      '选择 CSV、JSON 或受控 RDF 数据源',
+      '首个导入格式：受限 JSON（输入 profile 另行定义）',
       '预览字段并配置映射模板',
       '检查映射并由人工明确确认',
       '完成数据校验后再创建项目快照',
@@ -169,6 +205,40 @@ export const messages: Record<Locale, MessageSet> = {
     apiUnavailableTitle: '无法连接本地 API',
     apiUnavailableDescription: '请在项目目录启动服务：',
     startCommand: 'make setup && make dev',
+    workspacesTitle: '工作区',
+    workspacesDescription: '创建并查看本机工作区。此阶段只支持管理空工作区，不会导入或评估项目数据。',
+    createWorkspaceTitle: '创建工作区',
+    workspaceNameFieldLabel: '工作区名称',
+    workspaceNamePlaceholder: '例如：支付平台质量追溯',
+    workspaceNameHint: '1–80 个 Unicode 字符；不支持控制字符。',
+    createWorkspaceAction: '创建工作区',
+    workspaceListTitle: '本机工作区',
+    workspaceLoading: '正在读取工作区…',
+    workspaceCount: (count) => `${count} 个工作区`,
+    noWorkspacesTitle: '还没有工作区',
+    noWorkspacesDescription: '创建后，工作区会出现在此列表中。仓库示例数据仍保持独立。',
+    emptyWorkspaceStatus: '空工作区 · 尚未导入数据',
+    dateUnavailable: '创建时间不可用',
+    corruptWorkspaceName: '工作区不可用',
+    corruptWorkspaceDescription: '清单文件损坏或不受支持。原始文件保持不变。',
+    backToWorkspaces: '返回工作区',
+    workspaceUnavailableLabel: '工作区状态',
+    workspaceUnavailableDescription: '此工作区无法读取。返回列表查看其他工作区。',
+    workspaceDetailKicker: '本机工作区',
+    workspaceDetailDescription: '此页面只显示工作区元数据，不会更改仓库示例或创建快照。',
+    workspaceStateTitle: '工作区数据状态',
+    workspaceDataStatus: '导入数据',
+    noImportedData: '暂无导入数据',
+    activeSnapshotLabel: '活动快照',
+    noActiveSnapshot: '无活动快照',
+    workspaceAccessLabel: '当前能力',
+    workspaceReadonly: '本阶段只读',
+    workspaceCreatedLabel: '创建时间',
+    workspaceGenericError: '无法读取工作区。请检查本地 API 服务后重试。',
+    workspaceNameInvalidError: '名称需为 1–80 个字符，且不能包含控制字符。',
+    workspaceNotFoundError: '找不到此工作区。',
+    workspaceManifestError: '此工作区清单损坏或不受支持，暂时无法打开。',
+    workspaceStorageError: '本地工作区存储不可用。请检查服务端数据目录。',
   },
   en: {
     skipToContent: 'Skip to main content',
@@ -178,13 +248,14 @@ export const messages: Record<Locale, MessageSet> = {
     navOntology: 'Ontology model',
     navImport: 'Import data',
     navAnalysis: 'Quality analysis',
+    navWorkspaces: 'Workspaces',
     brandCaption: 'QUALITY EVIDENCE WORKBENCH',
-    workspaceLabel: 'CURRENT WORKSPACE',
-    workspaceName: 'Example project',
-    workspaceMeta: 'LOCAL EXAMPLE · READ ONLY',
-    sidebarNote: 'Bundled demo data only. No external project is connected.',
-    localMode: 'LOCAL WORKSPACE',
-    bundledLabel: 'DEMO DATA',
+    workspaceLabel: 'GLOBAL DATA SOURCE',
+    workspaceName: 'Bundled example · read only',
+    workspaceMeta: 'Workspace details do not change this source',
+    sidebarNote: 'Workspaces manage local projects. This bundled example stays separate.',
+    localMode: 'LOCAL MODE',
+    bundledLabel: 'BUNDLED EXAMPLE · READ ONLY',
     overviewKicker: 'PROJECT OVERVIEW / TRACEABILITY',
     overviewTitle: 'Quality evidence overview',
     overviewDescription: 'Follow requirements, tests, and evidence to see what the current data can tell you.',
@@ -240,7 +311,7 @@ export const messages: Record<Locale, MessageSet> = {
     mappingTitle: 'You confirm field meaning',
     mappingDescription: 'Preview fields and review their mapping first. A mapping can enter validation only after an explicit human confirmation.',
     importSteps: [
-      'Choose a CSV, JSON, or controlled RDF source',
+      'First planned importer: restricted JSON (input profile to follow)',
       'Preview fields and configure a mapping template',
       'Review and explicitly confirm the mapping',
       'Validate the data before creating a project snapshot',
@@ -258,5 +329,39 @@ export const messages: Record<Locale, MessageSet> = {
     apiUnavailableTitle: 'Local API unavailable',
     apiUnavailableDescription: 'Start the services from the repository root:',
     startCommand: 'make setup && make dev',
+    workspacesTitle: 'Workspaces',
+    workspacesDescription: 'Create and view local workspaces. This phase manages empty workspaces only; it does not import or assess project data.',
+    createWorkspaceTitle: 'Create a workspace',
+    workspaceNameFieldLabel: 'Workspace name',
+    workspaceNamePlaceholder: 'For example: Payments quality traceability',
+    workspaceNameHint: 'Use 1–80 Unicode code points; control characters are not allowed.',
+    createWorkspaceAction: 'Create workspace',
+    workspaceListTitle: 'Local workspaces',
+    workspaceLoading: 'Loading workspaces…',
+    workspaceCount: (count) => `${count} ${count === 1 ? 'workspace' : 'workspaces'}`,
+    noWorkspacesTitle: 'No workspaces yet',
+    noWorkspacesDescription: 'New workspaces will appear here. The bundled example stays separate.',
+    emptyWorkspaceStatus: 'Empty workspace · no imported data',
+    dateUnavailable: 'Creation time unavailable',
+    corruptWorkspaceName: 'Workspace unavailable',
+    corruptWorkspaceDescription: 'Its manifest is corrupt or unsupported. The original file is unchanged.',
+    backToWorkspaces: 'Back to workspaces',
+    workspaceUnavailableLabel: 'WORKSPACE STATUS',
+    workspaceUnavailableDescription: 'This workspace cannot be read. Return to the list to view other workspaces.',
+    workspaceDetailKicker: 'LOCAL WORKSPACE',
+    workspaceDetailDescription: 'This page shows workspace metadata only. It does not change the bundled example or create a snapshot.',
+    workspaceStateTitle: 'Workspace data status',
+    workspaceDataStatus: 'Imported data',
+    noImportedData: 'No imported data',
+    activeSnapshotLabel: 'Active snapshot',
+    noActiveSnapshot: 'No active snapshot',
+    workspaceAccessLabel: 'Available actions',
+    workspaceReadonly: 'Read only in this phase',
+    workspaceCreatedLabel: 'Created',
+    workspaceGenericError: 'Could not read the workspace. Check the local API and try again.',
+    workspaceNameInvalidError: 'Use 1–80 characters and no control characters.',
+    workspaceNotFoundError: 'This workspace could not be found.',
+    workspaceManifestError: 'This workspace manifest is corrupt or unsupported, so it cannot be opened.',
+    workspaceStorageError: 'Local workspace storage is unavailable. Check the server data directory.',
   },
 };

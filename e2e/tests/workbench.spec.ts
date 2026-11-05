@@ -10,6 +10,7 @@ test('Chinese overview identifies bundled data and unrun validation', async ({ p
   await page.getByRole('menuitem', { name: '数据导入' }).click();
   await expect(page.getByRole('heading', { name: '导入项目数据' })).toBeVisible();
   await expect(page.getByText(/导入流程尚未实现/)).toBeVisible();
+  await expect(page.getByText('首个导入格式：受限 JSON（输入 profile 另行定义）')).toBeVisible();
 });
 
 test('language switch presents the English copy on request', async ({ page }) => {
