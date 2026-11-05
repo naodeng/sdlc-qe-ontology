@@ -38,5 +38,5 @@ The light UI was reviewed in Chinese and English at 390px and 1440px, including 
 
 ## Limits / 限制
 
-- The Win32 storage path was verified by the hosted Windows CI job, not locally on macOS. The 12 Windows skips cover POSIX-only regressions and symlink cases skipped because creating those links may require additional privileges.
+- The Win32 storage path was verified by the hosted Windows CI job, not locally on macOS. The 12 Windows skips cover POSIX-specific tests and symlink tests skipped because creating those links may require additional privileges.
 - Workspace import, global active-workspace selection, single-writer locking, snapshots, and assessment remain out of scope. Overall MVP remains Candidate / No-Go.
