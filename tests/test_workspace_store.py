@@ -617,6 +617,8 @@ def test_store_rejects_symlink_manifest(tmp_path: Path) -> None:
 def test_list_reports_no_follow_eloop_as_corrupt_and_continues(
     tmp_path: Path, monkeypatch
 ) -> None:
+    if os.name == "nt":
+        pytest.skip("this race injection depends on POSIX directory descriptors")
     module = _load_store_module()
     store = module.FilesystemWorkspaceStore(tmp_path / "data")
     valid = store.create("Valid")
