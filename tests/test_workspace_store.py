@@ -187,6 +187,58 @@ def test_create_retries_collision_at_atomic_destination_claim(
     assert store.get(existing_id).name == "Existing"
 
 
+def test_create_does_not_publish_through_replaced_destination_symlink(
+    tmp_path: Path, monkeypatch
+) -> None:
+    if os.name == "nt":
+        pytest.skip("symlink creation may require elevated privileges on Windows")
+    module = _load_store_module()
+    store = module.FilesystemWorkspaceStore(tmp_path / "data")
+    workspace_id = "6f35fb35-d617-44f2-926c-4029da7d7007"
+    final_dir = tmp_path / "data/workspaces" / workspace_id
+    outside_dir = tmp_path / "outside"
+    outside_dir.mkdir()
+    outside_manifest = outside_dir / "manifest.json"
+    outside_manifest.write_bytes(b"preserve existing file")
+    real_link = os.link
+    real_rename = os.rename
+    replaced = False
+    monkeypatch.setattr(module, "uuid4", lambda: UUID(workspace_id))
+
+    def replace_claim_with_symlink() -> None:
+        nonlocal replaced
+        final_dir.rmdir()
+        final_dir.symlink_to(outside_dir, target_is_directory=True)
+        replaced = True
+
+    def link_with_swap(source, destination, *args, **kwargs):
+        if Path(destination) == Path("manifest.json") and kwargs.get("dst_dir_fd") is not None:
+            replace_claim_with_symlink()
+        return real_link(source, destination, *args, **kwargs)
+
+    def rename_with_swap(source, destination, *args, **kwargs):
+        nonlocal replaced
+        destination_path = Path(destination)
+        if destination_path == final_dir / "manifest.json":
+            replace_claim_with_symlink()
+        elif destination_path == final_dir and not final_dir.exists():
+            final_dir.symlink_to(outside_dir, target_is_directory=True)
+            replaced = True
+        return real_rename(source, destination, *args, **kwargs)
+
+    monkeypatch.setattr(module.os, "link", link_with_swap)
+    monkeypatch.setattr(module.os, "rename", rename_with_swap)
+
+    try:
+        with pytest.raises(WorkspaceStorageUnavailable):
+            store.create("Project")
+        assert replaced
+        assert outside_manifest.read_bytes() == b"preserve existing file"
+    finally:
+        if final_dir.is_symlink():
+            final_dir.unlink()
+
+
 def test_list_ignores_workspace_with_active_creation_marker(tmp_path: Path) -> None:
     module = _load_store_module()
     store = module.FilesystemWorkspaceStore(tmp_path / "data")
@@ -202,10 +254,11 @@ def test_create_failure_does_not_publish_partial_workspace(tmp_path: Path, monke
     module = _load_store_module()
     store = module.FilesystemWorkspaceStore(tmp_path / "data")
 
-    def fail_rename(*args, **kwargs):
-        raise OSError("rename failed")
+    def fail_publication(*args, **kwargs):
+        raise OSError("manifest publication failed")
 
-    monkeypatch.setattr(module.os, "rename", fail_rename)
+    publication_function = "rename" if os.name == "nt" else "link"
+    monkeypatch.setattr(module.os, publication_function, fail_publication)
 
     with pytest.raises(WorkspaceStorageUnavailable):
         store.create("Project")

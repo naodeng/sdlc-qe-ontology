@@ -37,6 +37,11 @@ _MANIFEST_KEYS = {
     "activeSnapshotId",
 }
 _CREATING_PREFIX = ".creating-"
+_SUPPORTS_DIRECTORY_HANDLES = (
+    hasattr(os, "O_DIRECTORY")
+    and os.open in os.supports_dir_fd
+    and os.link in os.supports_dir_fd
+)
 _RFC3339_UTC = re.compile(
     r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|\+00:00)$"
 )
@@ -250,15 +255,23 @@ class FilesystemWorkspaceStore:
                         "activeSnapshotId": None,
                     }
                     self._write_manifest(temp_dir / MANIFEST_FILE, manifest)
-                    try:
-                        final_dir.mkdir(mode=0o700)
-                    except FileExistsError:
-                        self._remove_owned_temp_dir(temp_dir)
-                        _remove_reservation(reservation)
-                        continue
-                    claimed_final_dir = True
-                    os.rename(temp_dir / MANIFEST_FILE, final_dir / MANIFEST_FILE)
-                    claimed_final_dir = False
+                    if os.name == "nt":
+                        try:
+                            os.rename(temp_dir, final_dir)
+                        except FileExistsError:
+                            self._remove_owned_temp_dir(temp_dir)
+                            _remove_reservation(reservation)
+                            continue
+                    else:
+                        try:
+                            final_dir.mkdir(mode=0o700)
+                        except FileExistsError:
+                            self._remove_owned_temp_dir(temp_dir)
+                            _remove_reservation(reservation)
+                            continue
+                        claimed_final_dir = True
+                        self._publish_manifest(temp_dir / MANIFEST_FILE, final_dir)
+                        claimed_final_dir = False
                     try:
                         temp_dir.rmdir()
                     except OSError:
@@ -389,6 +402,74 @@ class FilesystemWorkspaceStore:
             json.dump(manifest, stream, ensure_ascii=False, separators=(",", ":"))
             stream.flush()
             os.fsync(stream.fileno())
+
+    @staticmethod
+    def _publish_manifest(source: Path, destination_directory: Path) -> None:
+        """Publish the complete manifest without following a replaced workspace path."""
+        if not _SUPPORTS_DIRECTORY_HANDLES:
+            metadata = destination_directory.lstat()
+            if not stat.S_ISDIR(metadata.st_mode):
+                raise OSError("workspace destination changed during create")
+            os.link(source, destination_directory / MANIFEST_FILE, follow_symlinks=False)
+            return
+
+        flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0)
+        directory_fd = os.open(destination_directory, flags)
+        published = False
+        try:
+            if not FilesystemWorkspaceStore._directory_handle_matches(
+                destination_directory, directory_fd
+            ):
+                raise OSError("workspace destination changed during create")
+
+            source_stat = source.stat()
+            os.link(
+                source,
+                MANIFEST_FILE,
+                dst_dir_fd=directory_fd,
+                follow_symlinks=False,
+            )
+            published = True
+            if not FilesystemWorkspaceStore._directory_handle_matches(
+                destination_directory, directory_fd
+            ):
+                raise OSError("workspace destination changed during create")
+            os.fsync(directory_fd)
+            if not FilesystemWorkspaceStore._directory_handle_matches(
+                destination_directory, directory_fd
+            ):
+                raise OSError("workspace destination changed during create")
+        except OSError:
+            if published:
+                try:
+                    destination_stat = os.stat(
+                        MANIFEST_FILE,
+                        dir_fd=directory_fd,
+                        follow_symlinks=False,
+                    )
+                    if (
+                        destination_stat.st_dev == source_stat.st_dev
+                        and destination_stat.st_ino == source_stat.st_ino
+                    ):
+                        os.unlink(MANIFEST_FILE, dir_fd=directory_fd)
+                except OSError:
+                    pass
+            raise
+        finally:
+            os.close(directory_fd)
+
+    @staticmethod
+    def _directory_handle_matches(path: Path, descriptor: int) -> bool:
+        try:
+            named = path.lstat()
+        except OSError:
+            return False
+        opened = os.fstat(descriptor)
+        return (
+            stat.S_ISDIR(named.st_mode)
+            and named.st_dev == opened.st_dev
+            and named.st_ino == opened.st_ino
+        )
 
     @staticmethod
     def _read_workspace(directory: Path, workspace_id: str) -> Workspace:

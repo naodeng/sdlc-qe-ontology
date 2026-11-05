@@ -19,7 +19,7 @@ Run checks with make verify. First install Playwright Chromium with cd frontend 
 - [English setup guide](README.en.md)
 - [Product and implementation baseline](docs/designs/current-baseline.md)
 - [Local workspace requirement and implementation plan](docs/features/REQ-WORKSPACE-001-local-workspaces.md)
-- [Latest workspace verification evidence](docs/qa/workspace-storage-race-hardening-20261105.md)
+- [Latest workspace verification evidence](docs/qa/pr-review-fixes-20261105.md)
 - [Repository bootstrap plan](docs/plans/20261104-repository-bootstrap.md)
 - [Repository engineering standards](docs/standards/README.md)
 - [Current API contract](docs/designs/api.yaml)

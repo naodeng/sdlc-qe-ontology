@@ -54,7 +54,7 @@ cd .. && make e2e
 
 - [产品与实现基线](docs/designs/current-baseline.md)
 - [本地工作区需求与实现计划](docs/features/REQ-WORKSPACE-001-local-workspaces.md)
-- [最新工作区验证证据](docs/qa/workspace-storage-race-hardening-20261105.md)
+- [最新工作区验证证据](docs/qa/pr-review-fixes-20261105.md)
 - [本次仓库搭建计划](docs/plans/20261104-repository-bootstrap.md)
 - [工程标准](docs/standards/README.md)
 - [实现中的 API 契约](docs/designs/api.yaml)
